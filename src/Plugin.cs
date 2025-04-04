@@ -9,7 +9,6 @@ global using Mono.Cecil.Cil;
 global using MonoMod.Cil;
 global using UnityEngine;
 global using RWCustom;
-global using Debug = UnityEngine.Debug;
 global using Random = UnityEngine.Random;
 global using Vector2 = UnityEngine.Vector2;
 global using Color = UnityEngine.Color;
