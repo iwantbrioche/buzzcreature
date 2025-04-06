@@ -1,5 +1,5 @@
 ﻿
-namespace Template.Hooks
+namespace BuzzCreature.Hooks
 {
     public static class Hooks
     {

@@ -17,23 +17,29 @@ using System.Security;
 using System.Security.Permissions;
 using BepInEx.Logging;
 using System.Runtime.CompilerServices;
+using BuzzCreature.Objects.Buzz;
+using Fisobs.Core;
+using System.IO;
 
 #pragma warning disable CS0618
 
 [module: UnverifiableCode]
 [assembly: SecurityPermission(SecurityAction.RequestMinimum, SkipVerification = true)]
 
-namespace Template
+namespace BuzzCreature
 {
     [BepInPlugin(MOD_ID, MOD_NAME, MOD_VER)]
-    public class TestingMod : BaseUnityPlugin
+    public class BuzzPlugin : BaseUnityPlugin
     {
-        public const string MOD_ID = "id.name";
-        public const string MOD_NAME = "Name";
-        public const string MOD_VER = "1.0";
+        public const string MOD_ID = "iwantbread.buzzcreature";
+        public const string MOD_NAME = "Buzz Creature";
+        public const string MOD_VER = "0.0";
+        private const string ATLASES_DIR = "buzzAtlases";
         public static new ManualLogSource Logger { get; private set; }
         private void OnEnable()
         {
+            Content.Register(new BuzzCritob());
+
             On.RainWorld.OnModsInit += RainWorld_OnModsInit;
             On.RainWorld.PostModsInit += RainWorld_PostModsInit;
             Logger = base.Logger;
@@ -50,6 +56,8 @@ namespace Template
                 if (IsInit) return;
 
                 Hooks.Hooks.PatchHooks();
+
+                LoadAtlases();
 
                 IsInit = true;
             }
@@ -76,6 +84,32 @@ namespace Template
                 Logger.LogError(ex);
                 throw;
             }
+        }
+
+        private static void LoadAtlases()
+        {
+            string[] atlasPaths = AssetManager.ListDirectory(ATLASES_DIR);
+            foreach (string filePath in atlasPaths)
+            {
+                if (Path.GetExtension(filePath) == ".txt")
+                {
+                    string atlasName = Path.GetFileNameWithoutExtension(filePath);
+                    try
+                    {
+                        Logger.LogDebug($"loading {ATLASES_DIR + Path.AltDirectorySeparatorChar + atlasName} atlas!");
+
+                        Futile.atlasManager.LoadAtlas(ATLASES_DIR + Path.AltDirectorySeparatorChar + atlasName);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogError($"Error while loading {MOD_NAME} atlases!");
+                        Logger.LogError(ex);
+                        throw;
+                    }
+                }
+            }
+
+            Logger.LogInfo($"Loaded {MOD_NAME} atlases successfully!");
         }
 
     }

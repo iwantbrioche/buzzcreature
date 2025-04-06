@@ -1,0 +1,52 @@
+{"frames": {
+
+"buzzBody0.png":
+{
+	"frame": {"x":0,"y":0,"w":24,"h":22},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":24,"h":22},
+	"sourceSize": {"w":24,"h":22}
+},
+"buzzBody1.png":
+{
+	"frame": {"x":24,"y":0,"w":24,"h":22},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":24,"h":22},
+	"sourceSize": {"w":24,"h":22}
+},
+"buzzBody2.png":
+{
+	"frame": {"x":48,"y":0,"w":24,"h":22},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":24,"h":22},
+	"sourceSize": {"w":24,"h":22}
+},
+"buzzBody3.png":
+{
+	"frame": {"x":72,"y":0,"w":24,"h":22},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":24,"h":22},
+	"sourceSize": {"w":24,"h":22}
+},
+"buzzBody4.png":
+{
+	"frame": {"x":96,"y":0,"w":24,"h":22},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":24,"h":22},
+	"sourceSize": {"w":24,"h":22}
+}},
+"meta": {
+	"app": "https://www.codeandweb.com/texturepacker",
+	"version": "1.0",
+	"image": "BuzzBodyAtlas.png",
+	"format": "RGBA8888",
+	"size": {"w":120,"h":22},
+	"scale": "1",
+	"smartupdate": "$TexturePacker:SmartUpdate:3d8f8def839e5f813dae937ac360b1aa:355a4d7e5b8f0279bfc2172ea627fd42:e382201fb2fd3f4cb1a475fbb8e2cba1$"
+}
+}

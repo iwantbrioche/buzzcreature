@@ -1,12 +1,12 @@
 {
-  "id": "id.name",
-  "name": "Name",
-  "version": "1.0",
+  "id": "iwantbread.buzzcreature",
+  "name": "Buzz Creature",
+  "version": "0.0",
   "target_game_version": "v1.10.1",
   "authors": "",
   "description": "",
-  "requirements": [],
-  "requirements_names": [],
+  "requirements": ["fisobs"],
+  "requirements_names": ["Fisobs"],
   "priorities": [], 
   "checksum_override_version": false
 }
