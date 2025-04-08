@@ -5,11 +5,8 @@ namespace BuzzCreature.Objects.Buzz
     {
         public BuzzAI AI;
         public Vector2 moveDir;
-        public Vector2 lookDir;
-        public Vector2 oldLookDir;
+        public Vector2 lookDirection;
         public Vector2 bodyRotation;
-        public Vector2 oldBodyRotation;
-        public float lookRotation;
         public float sinCounter;
         public bool flying;
         public float flyBoost = 1f;
@@ -51,27 +48,22 @@ namespace BuzzCreature.Objects.Buzz
                 //Stun(12);
             }
 
-            oldLookDir = lookDir;
-
-            oldBodyRotation = bodyRotation;
             bodyRotation = Custom.DirVec(bodyChunks[0].pos, bodyChunks[1].pos);
             if (Consious && AI.creatureLooker.lookCreature != null)
             {
                 if (AI.creatureLooker.lookCreature.VisualContact)
                 {
-                    lookDir = Custom.DirVec(mainBodyChunk.pos, AI.creatureLooker.lookCreature.representedCreature.realizedCreature.firstChunk.pos);
+                    lookDirection = Custom.DirVec(mainBodyChunk.pos, AI.creatureLooker.lookCreature.representedCreature.realizedCreature.firstChunk.pos);
                 }
                 else
                 {
-                    lookDir = Custom.DirVec(mainBodyChunk.pos, room.MiddleOfTile(AI.creatureLooker.lookCreature.BestGuessForPosition()));
+                    lookDirection = Custom.DirVec(mainBodyChunk.pos, room.MiddleOfTile(AI.creatureLooker.lookCreature.BestGuessForPosition()));
                 }
-                Vector2 lookRot = Custom.RotateAroundOrigo(lookDir, Custom.AimFromOneVectorToAnother(Vector2.zero, new Vector2(0f - bodyRotation.x, bodyRotation.y)));
-                lookRotation = Custom.AimFromOneVectorToAnother(-lookRot, lookRot);
+                Vector2 lookRot = Custom.RotateAroundOrigo(lookDirection, Custom.AimFromOneVectorToAnother(Vector2.zero, new Vector2(0f - bodyRotation.x, bodyRotation.y)));
             }
             else
             {
-                lookDir = Vector2.Lerp(lookDir, Vector2.zero, 0.1f);
-                lookRotation *= 0.8f;
+                lookDirection = Vector2.Lerp(lookDirection, Vector2.zero, 0.1f);
             }
             Act();
         }
@@ -172,7 +164,7 @@ namespace BuzzCreature.Objects.Buzz
             bodyChunks[0].vel += Vector2.ClampMagnitude(moveDir - bodyChunks[0].pos, 20f) / 20f * 1.5f * accel * flyBoost;
 
             // Rotate butt away from lookDir
-            bodyChunks[1].vel -= lookDir * 0.1f;
+            bodyChunks[1].vel -= lookDirection * 0.1f;
         }
 
 
