@@ -1,7 +1,4 @@
 ﻿
-
-using System;
-
 namespace BuzzCreature.Objects.Buzz
 {
     public class BuzzGraphics : GraphicsModule
@@ -126,123 +123,197 @@ namespace BuzzCreature.Objects.Buzz
 
             }
         }
-
-        public class BuzzArms
+        public class BuzzHand : Limb
         {
-            public class BuzzHand : Limb
-            {
-                public BuzzGraphics graphics => owner as BuzzGraphics;
-                public Buzz buzz => graphics.buzz;
-                public float armLength = 20f;
-                public BuzzHand(BuzzGraphics owner, int limbNum) : base(owner, owner.buzz.bodyChunks[0], limbNum, 1f, 0.3f, 0.6f, 12f, 0.8f)
-                {
-                    mode = Mode.Dangle;
-                }
-
-                public override void Update()
-                {
-                    base.Update();
-
-                    vel.y -= buzz.gravity;
-                    if (mode == Mode.Dangle)
-                    {
-                        ConnectToPoint(connection.pos, armLength, push: false, 0f, Vector2.zero, 0.4f, 0.1f);
-                    }
-                    else
-                    {
-                        ConnectToPoint(connection.pos, armLength, push: false, 0f, connection.vel, 0.4f, 0.1f);
-                    }
-                }
-            }
-
-            private BuzzGraphics g;
-            private int firstSprite;
+            public BuzzGraphics graphics => owner as BuzzGraphics;
+            public Buzz buzz => graphics.buzz;
+            public Vector2 connectionPos;
+            public Vector2 lastConnectionPos;
+            public float armLength;
+            public int firstSprite;
             public int totalSprites;
-            public BuzzHand[,] hands;
-            public BuzzArms(BuzzGraphics ow, int firstSprite)
+            public int side;
+            public bool small;
+            private bool debugVis = false;
+            public BuzzHand(BuzzGraphics owner, int limbNum, int firstSprite) : base(owner, owner.buzz.bodyChunks[0], limbNum, 1f, 0.3f, 0.6f, 12f, 0.8f)
             {
-                g = ow;
                 this.firstSprite = firstSprite;
-
-                hands = new BuzzHand[2, 3];
-
-                for (int i = 0; i < 2; i++)
+                small = limbNumber % 2 == 0;
+                totalSprites += 1;
+                armLength = small ? 10f : 20f;
+                if (debugVis)
                 {
-                    for (int j = 0; j < 3; j++)
-                    {
-                        hands[i, j] = new(g, j * 2 + i);
-                    }
+                    totalSprites += 3;
+                    if (!small) totalSprites += 1;
+                }
+                mode = Mode.Dangle;
+            }
+
+            public override void Update()
+            {
+                base.Update();
+                lastConnectionPos = connectionPos;
+                connectionPos = connection.pos;
+                if (!small)
+                {
+                    connectionPos.x += side == 0 ? -8f : 8f;
+                }
+                else
+                {
+                    connectionPos.y -= 6f;
+                    connectionPos.x += side == 0 ? -3f : 3f;
                 }
 
-                totalSprites += 6;
-            }
-
-            private int HandSprite(int side, int part)
-            {
-                return firstSprite + part * 2 + side;
-            }
-
-            public void Update()
-            {
-                for (int i = 0; i < 2; i++)
+                vel.y -= graphics.buzz.gravity;
+                if (mode == Mode.Dangle)
                 {
-                    for (int j = 0; j < 3; j++)
-                    {
-                        hands[i, j].Update();
-                    }
+                    ConnectToPoint(connectionPos, armLength, push: false, 0f, Vector2.zero, 0.4f, 0.1f);
+                }
+                else
+                {
+                    ConnectToPoint(connectionPos, armLength, push: false, 0f, connection.vel, 0.4f, 0.1f);
                 }
             }
 
             public void InitiateSprites(RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam)
             {
-                for (int i = 0; i < 2; i++)
+                TriangleMesh.Triangle[] tris =
+                [
+                    new(0,1,2),
+                    new(2,1,3),
+                    new(3,2,4),
+                    new(4,2,5),
+                    new(5,4,6),
+                    new(6,4,7),
+                    new(7,6,8),
+                    new(8,6,9),
+                    new(9,8,10)
+                ];
+
+                if (small)
                 {
-                    for (int j = 0; j < 3; j++)
+                    tris =
+                    [
+                        new(0,1,2),
+                        new(2,1,3),
+                        new(3,2,4)
+                    ];
+
+                }
+
+                if (debugVis)
+                {
+                    if (!small)
                     {
-                        sLeaser.sprites[HandSprite(i, j)] = new("pixel");
-                        sLeaser.sprites[HandSprite(i, j)].scaleX = 2f;
-                        sLeaser.sprites[HandSprite(i, j)].anchorY = 0f;
+                        sLeaser.sprites[firstSprite + 1] = new("pixel")
+                        {
+                            scale = 2f,
+                            color = new(1f, 0f, 0f)
+                        };
+                        sLeaser.sprites[firstSprite + 2] = new("pixel")
+                        {
+                            scale = 1f,
+                            color = new(0f, 1f, 0f)
+                        };
+                        sLeaser.sprites[firstSprite + 3] = new("pixel")
+                        {
+                            scale = 1f,
+                            color = new(0f, 1f, 1f)
+                        };
+                        sLeaser.sprites[firstSprite + 4] = new("pixel")
+                        {
+                            scale = 1f,
+                            color = new(0f, 0f, 1f)
+                        };
+                    }
+                    else
+                    {
+                        sLeaser.sprites[firstSprite + 1] = new("pixel")
+                        {
+                            scale = 2f,
+                            color = new(0.7f, 0f, 0f)
+                        };
+                        sLeaser.sprites[firstSprite + 2] = new("pixel")
+                        {
+                            scale = 1f,
+                            color = new(0f, 0.7f, 0f)
+                        };
+                        sLeaser.sprites[firstSprite + 3] = new("pixel")
+                        {
+                            scale = 1f,
+                            color = new(0f, 0f, 0.7f)
+                        };
                     }
                 }
+                sLeaser.sprites[firstSprite] = new TriangleMesh("Futile_White", tris, customColor: true);
+
+
             }
 
             public void DrawSprites(RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam, float timeStacker, Vector2 camPos)
             {
-                for (int i = 0; i < 2; i++)
+                Vector2 connection = Vector2.Lerp(lastConnectionPos, connectionPos, timeStacker);
+                Vector2 handPos = Vector2.Lerp(lastPos, pos, timeStacker);
+
+                float flip = -1f + side * 2f;
+
+                float ikX = small ? 3f : 16f;
+                float ikY = small ? 4f : 7f;
+                Vector2 elbowIK = Custom.InverseKinematic(connection, handPos, ikY, ikX, -flip);
+                ikX = 7f;
+                ikY = 9f;
+                Vector2 wristIK = Custom.InverseKinematic(elbowIK, handPos, ikY, ikX, flip);
+
+                (sLeaser.sprites[firstSprite] as TriangleMesh).MoveVertice(0, connection - Custom.PerpendicularVector(elbowIK - connection) * flip - camPos);
+                (sLeaser.sprites[firstSprite] as TriangleMesh).MoveVertice(1, connection + Custom.PerpendicularVector(elbowIK - connection) * flip * 2f - camPos);
+                if (!small)
                 {
-                    for (int j = 0; j < 3; j++)
-                    {
-                        Vector2 handPos = Vector2.Lerp(hands[i, j].pos, hands[i, j].pos, timeStacker);
-
-                        Vector2 offset = new(i > 0 ? 7f : -7f, 3f - 3f * j);
-
-                        sLeaser.sprites[HandSprite(i, j)].SetPosition(handPos - camPos);
-                        sLeaser.sprites[HandSprite(i, j)].rotation = Custom.AimFromOneVectorToAnother(handPos, hands[i, j].connection.pos + offset);
-                        sLeaser.sprites[HandSprite(i, j)].scaleY = Vector2.Distance(handPos, hands[i, j].connection.pos + offset);
-                    }
+                    (sLeaser.sprites[firstSprite] as TriangleMesh).MoveVertice(2, elbowIK - (connection - elbowIK).normalized * flip - camPos);
+                    (sLeaser.sprites[firstSprite] as TriangleMesh).MoveVertice(3, elbowIK + Custom.PerpendicularVector(connection - elbowIK) * flip * 3f - camPos);
+                    (sLeaser.sprites[firstSprite] as TriangleMesh).MoveVertice(4, elbowIK + Custom.PerpendicularVector(elbowIK - wristIK) * flip - camPos);
+                    (sLeaser.sprites[firstSprite] as TriangleMesh).MoveVertice(5, elbowIK - Custom.PerpendicularVector(elbowIK - wristIK) * flip * 1.5f - camPos);
+                    (sLeaser.sprites[firstSprite] as TriangleMesh).MoveVertice(6, wristIK - Custom.PerpendicularVector(wristIK - elbowIK) * flip * 1.5f - camPos);
+                    (sLeaser.sprites[firstSprite] as TriangleMesh).MoveVertice(7, wristIK + Custom.PerpendicularVector(wristIK - elbowIK) * flip * 1.5f - camPos);
+                    (sLeaser.sprites[firstSprite] as TriangleMesh).MoveVertice(8, wristIK + Custom.PerpendicularVector(elbowIK - handPos) * flip * 1.5f - camPos);
+                    (sLeaser.sprites[firstSprite] as TriangleMesh).MoveVertice(9, wristIK - Custom.PerpendicularVector(elbowIK - handPos) * flip - camPos);
+                    (sLeaser.sprites[firstSprite] as TriangleMesh).MoveVertice(10, handPos - camPos);
                 }
-            }
+                else
+                {
+                    (sLeaser.sprites[firstSprite] as TriangleMesh).MoveVertice(2, elbowIK - Custom.PerpendicularVector(connection - elbowIK) * flip - camPos);
+                    (sLeaser.sprites[firstSprite] as TriangleMesh).MoveVertice(3, elbowIK + Custom.PerpendicularVector(connection - elbowIK) * flip * 1.5f - camPos);
+                    (sLeaser.sprites[firstSprite] as TriangleMesh).MoveVertice(4, handPos - camPos);
+                }
 
-            public void AddToContainer(RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam, FContainer newContatiner)
-            {
+                if (debugVis)
+                {
+                    if (small)
+                    {
+                        sLeaser.sprites[firstSprite + 1].SetPosition(connection - camPos);
+                        sLeaser.sprites[firstSprite + 2].SetPosition(elbowIK - camPos);
+                        sLeaser.sprites[firstSprite + 3].SetPosition(handPos - camPos);
+                    }
+                    else
+                    {
+                        sLeaser.sprites[firstSprite + 1].SetPosition(connection - camPos);
+                        sLeaser.sprites[firstSprite + 2].SetPosition(elbowIK - camPos);
+                        sLeaser.sprites[firstSprite + 3].SetPosition(wristIK - camPos);
+                        sLeaser.sprites[firstSprite + 4].SetPosition(handPos - camPos);
+                    }
+
+                }
 
             }
 
             public void ApplyPalette(RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam, RoomPalette palette)
             {
-                for (int i = 0; i < 2; i++)
-                {
-                    for (int j = 0; j < 3; j++)
-                    {
-                        sLeaser.sprites[HandSprite(i, j)].color = Color.blue;
-                    }
-                }
+                (sLeaser.sprites[firstSprite] as TriangleMesh).color = palette.blackColor;
             }
         }
 
         private Buzz buzz;
         private BuzzAntennae antennae;
-        private BuzzArms arms;
+        private BuzzHand[,] hands;
         public GenericBodyPart head;
 
         public Vector2[,] drawPositions;
@@ -275,12 +346,19 @@ namespace BuzzCreature.Objects.Buzz
             antennae = new(this, totalSprites);
             totalSprites += antennae.totalSprites;
 
-            arms = new(this, totalSprites);
-            totalSprites += arms.totalSprites;
-
+            hands = new BuzzHand[2, 2];
+            int limbNum = 0;
+            for (int i = 0; i < 2; i++)
+            {
+                for (int j = 0; j < 2; j++)
+                {
+                    hands[i, j] = new(this, limbNum++, totalSprites);
+                    totalSprites += hands[i, j].totalSprites;
+                    hands[i, j].side = i;
+                }
+            }
 
             drawPositions = new Vector2[buzz.bodyChunks.Length, 2];
-
             for (int i = 0; i < buzz.bodyChunks.Length; i++)
             {
                 drawPositions[i, 0] = buzz.bodyChunks[i].pos;
@@ -298,6 +376,10 @@ namespace BuzzCreature.Objects.Buzz
                 for (int j = 0; j < antennae.segments; j++)
                 {
                     bodyParts.Add(antennae.antennae[i, j]);
+                }
+                for (int b = 0; b < 2; b++)
+                {
+                    bodyParts.Add(hands[i, b]);
                 }
             }
 
@@ -322,8 +404,15 @@ namespace BuzzCreature.Objects.Buzz
 
             sLeaser.sprites[EyeSprite] = new("buzz0Eye0");
 
+            for (int i = 0; i < 2; i++)
+            {
+                for (int j = 0; j < 2; j++)
+                {
+                    hands[i, j].InitiateSprites(sLeaser, rCam);
+                }
+            }
+
             antennae.InitiateSprites(sLeaser, rCam);
-            arms.InitiateSprites(sLeaser, rCam);
             AddToContainer(sLeaser, rCam, null);
 
             base.InitiateSprites(sLeaser, rCam);
@@ -371,8 +460,15 @@ namespace BuzzCreature.Objects.Buzz
             sLeaser.sprites[HeadSprite].SetPosition(headPos - camPos);
             sLeaser.sprites[EyeSprite].SetPosition(headPos - camPos + buzz.lookDirection);
 
+            for (int i = 0; i < 2; i++)
+            {
+                for (int j = 0; j < 2; j++)
+                {
+                    hands[i, j].DrawSprites(sLeaser, rCam, timeStacker, camPos);
+                }
+            }
+
             antennae.DrawSprites(sLeaser, rCam, timeStacker, camPos);
-            arms.DrawSprites(sLeaser, rCam, timeStacker, camPos);
             base.DrawSprites(sLeaser, rCam, timeStacker, camPos);
 
         }
@@ -388,8 +484,15 @@ namespace BuzzCreature.Objects.Buzz
             sLeaser.sprites[BodySprite].color = Color.gray;
             sLeaser.sprites[EyeSprite].color = blackColor;
 
+            for (int i = 0; i < 2; i++)
+            {
+                for (int j = 0; j < 2; j++)
+                {
+                    hands[i, j].ApplyPalette(sLeaser, rCam, palette);
+                }
+            }
+
             antennae.ApplyPalette(sLeaser, rCam, palette);
-            arms.ApplyPalette(sLeaser, rCam, palette);
             base.ApplyPalette(sLeaser, rCam, palette);
         }
 
@@ -427,9 +530,15 @@ namespace BuzzCreature.Objects.Buzz
                 buttScales[i] = 0.7f + Mathf.Sin(pos * Mathf.PI - 0.4f);
             }
 
-            antennae.Update();
-            arms.Update();
+            for (int i = 0; i < 2; i++)
+            {
+                for (int j = 0; j < 2; j++)
+                {
+                    hands[i, j].Update();
+                }
+            }
 
+            antennae.Update();
             base.Update();
         }
     }
