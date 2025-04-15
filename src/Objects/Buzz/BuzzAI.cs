@@ -1,19 +1,15 @@
 ﻿
 using System;
+using System.Drawing;
 
 namespace BuzzCreature.Objects.Buzz
 {
     public class BuzzAI : ArtificialIntelligence, IUseARelationshipTracker, IReactToSocialEvents, FriendTracker.IHaveFriendTracker, ILookingAtCreatures
     {
-        public class Behavior : ExtEnum<Behavior>
+        public class Behavior(string value, bool register = false) : ExtEnum<Behavior>(value, register)
         {
             public static readonly Behavior Idle = new("Idle", register: true);
             public static readonly Behavior Flee = new("Flee", register: true);
-
-            public Behavior(string value, bool register = false) : base(value, register)
-            {
-
-            } 
         }
 
         public Buzz buzz;
@@ -61,7 +57,7 @@ namespace BuzzCreature.Objects.Buzz
             //debugDestinationVisualizer?.Update();
             //debugTrackerVisualizer?.Update();
 
-            if (buzz.room.game.devToolsActive && Input.GetMouseButton(0))
+            if (buzz.room.game.devToolsActive && Input.GetMouseButton(2))
             {
                 creature.abstractAI.SetDestination(buzz.room.GetWorldCoordinate((Vector2)Futile.mousePosition + buzz.room.game.cameras[0].pos));
             }
@@ -87,7 +83,7 @@ namespace BuzzCreature.Objects.Buzz
 
             if (behavior == Behavior.Idle)
             {
-                //IdleBehavior();
+                IdleBehavior();
             }
             else if (behavior == Behavior.Flee)
             {
@@ -99,7 +95,7 @@ namespace BuzzCreature.Objects.Buzz
                 creature.abstractAI.SetDestination(destination);
             }
 
-                base.Update();
+            base.Update();
         }
 
         public void IdleBehavior()

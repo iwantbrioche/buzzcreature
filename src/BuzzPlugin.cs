@@ -38,6 +38,7 @@ namespace BuzzCreature
         public static new ManualLogSource Logger { get; private set; }
         private void OnEnable()
         {
+            BuzzEnums.Register();
             Content.Register(new BuzzCritob());
 
             On.RainWorld.OnModsInit += RainWorld_OnModsInit;

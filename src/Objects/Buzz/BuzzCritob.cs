@@ -8,8 +8,7 @@ namespace BuzzCreature.Objects.Buzz
 {
     public class BuzzCritob: Critob
     {
-        public static readonly CreatureTemplate.Type Buzz = new("Buzz", register: true);
-        public BuzzCritob() : base(Buzz)
+        public BuzzCritob() : base(BuzzEnums.Buzz)
         {
             LoadedPerformanceCost = 20f;
             SandboxPerformanceCost = new(linear: 0.6f, exponential: 0.1f);
@@ -32,7 +31,7 @@ namespace BuzzCreature.Objects.Buzz
             connectionResistances.Add(new TileConnectionResistance(MovementConnection.MovementType.OffScreenMovement, 1f, PathCost.Legality.Allowed));
             connectionResistances.Add(new TileConnectionResistance(MovementConnection.MovementType.BetweenRooms, 1f, PathCost.Legality.Allowed));
 
-            CreatureTemplate buzzTemplate = new(Buzz, null, typeResistances, connectionResistances,
+            CreatureTemplate buzzTemplate = new(BuzzEnums.Buzz, null, typeResistances, connectionResistances,
                 new CreatureTemplate.Relationship(CreatureTemplate.Relationship.Type.Ignores, 1f))
             {
                 baseDamageResistance = 0.2f,
@@ -65,9 +64,9 @@ namespace BuzzCreature.Objects.Buzz
 
         public override void EstablishRelationships()
         {
-            Relationships relationships = new(Buzz);
+            Relationships relationships = new(BuzzEnums.Buzz);
 
-            relationships.IsInPack(Buzz, 1f);
+            relationships.IsInPack(BuzzEnums.Buzz, 1f);
         }
 
         public override ArtificialIntelligence CreateRealizedAI(AbstractCreature acrit)

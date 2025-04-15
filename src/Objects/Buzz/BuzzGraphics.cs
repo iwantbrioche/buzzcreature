@@ -1,9 +1,15 @@
 ﻿
+using Smoke;
+
 namespace BuzzCreature.Objects.Buzz
 {
+    /*  ivar ideas
+     * eye variation
+     * abdomen size
+     */
     public class BuzzGraphics : GraphicsModule
     {
-        public class BuzzAntennae
+        private class BuzzAntennae
         {
             private BuzzGraphics graphics;
             private Buzz buzz => graphics.buzz;
@@ -58,7 +64,7 @@ namespace BuzzCreature.Objects.Buzz
                         if (j == 0)
                         {
                             antennae[i, j].vel += AntennaDir(i) * 5f;
-                            antennae[i, j].vel.x -= buzz.bodyRotation.x * -6f;
+                            antennae[i, j].vel.x -= graphics.bodyRotation.x * -6f;
                             antennae[i, j].ConnectToPoint(AnchorPoint(i), 4f, push: true, 0f, buzz.bodyChunks[0].vel, 0f, 0f);
                         }
                         else
@@ -69,7 +75,7 @@ namespace BuzzCreature.Objects.Buzz
                             antennae[i, j].ConnectToPoint(antennae[i, j - 1].pos + dir * dist, 6f, true, 0f, buzz.bodyChunks[0].vel, 0f, 0f);
                         }
                         antennae[i, j].vel += Custom.DirVec(pos, antennae[i, j].pos) * 3f * Mathf.Pow(1f - a, 0.3f);
-                        antennae[i, j].vel += buzz.lookDirection * 0.1f * a;
+                        antennae[i, j].vel += graphics.lookDirection * 0.1f * a;
                         antennae[i, j].vel.y += Mathf.Abs(buzz.bodyChunks[0].vel.y);
 
                         if (!Custom.DistLess(buzz.mainBodyChunk.pos, antennae[i, j].pos, 200f))
@@ -123,7 +129,7 @@ namespace BuzzCreature.Objects.Buzz
 
             }
         }
-        public class BuzzHand : Limb
+        private class BuzzHand : Limb
         {
             public BuzzGraphics graphics => owner as BuzzGraphics;
             public Buzz buzz => graphics.buzz;
@@ -152,16 +158,52 @@ namespace BuzzCreature.Objects.Buzz
             public override void Update()
             {
                 base.Update();
+
+                if (buzz.movementMode == Buzz.MovementMode.Flying)
+                {
+                    mode = Mode.HuntAbsolutePosition;
+                    absoluteHuntPos = new Vector2(buzz.bodyChunks[1].pos.x, Mathf.Lerp(buzz.bodyChunks[0].pos.y - 30f, buzz.bodyChunks[1].pos.y, Mathf.Pow(Mathf.InverseLerp(0.4f, 1f, Mathf.Abs(buzz.bodyRotation.x)), 0.8f)));
+                    if (!small)
+                    {
+                        absoluteHuntPos.x += 5f * side;
+                        absoluteHuntPos.y -= Mathf.Abs(graphics.bodyRotation.x) * 6f;
+
+                        if (side == -Mathf.Sign(graphics.bodyRotation.x))
+                        {
+                            absoluteHuntPos.x -= Mathf.Sin(graphics.bodyRotation.x * Mathf.PI) * 10f;
+                        }
+                    }
+                    else
+                    {
+                        absoluteHuntPos.x -= graphics.bodyRotation.x * 3f;
+                        absoluteHuntPos.y -= Mathf.Abs(graphics.bodyRotation.x) * 15f;
+                    }
+                }
+
                 lastConnectionPos = connectionPos;
                 connectionPos = connection.pos;
                 if (!small)
                 {
-                    connectionPos.x += side == 0 ? -8f : 8f;
+                    connectionPos.x += 8f * side;
+                    connectionPos.x -= graphics.bodyRotation.x * 2f;
+                    connectionPos.y -= Mathf.Abs(graphics.bodyRotation.x) * 2f;
+                    if (side == Mathf.Sign(graphics.bodyRotation.x))
+                    {
+                        connectionPos.x -= graphics.bodyRotation.x * 5f;
+                        connectionPos.y += Mathf.Abs(graphics.bodyRotation.x * 3f);
+                    }
+                    else
+                    {
+                        connectionPos.x += graphics.bodyRotation.x * 2f;
+                        connectionPos.y += Mathf.Abs(graphics.bodyRotation.x * 3f);
+                    }
                 }
                 else
                 {
-                    connectionPos.y -= 6f;
-                    connectionPos.x += side == 0 ? -3f : 3f;
+                    connectionPos.y -= 4f;
+                    connectionPos.y -= 1f + Mathf.Clamp01(-graphics.bodyRotation.y);
+                    connectionPos.x += 3f * side;
+                    connectionPos.x -= graphics.bodyRotation.x * 7f;
                 }
 
                 vel.y -= graphics.buzz.gravity;
@@ -255,17 +297,18 @@ namespace BuzzCreature.Objects.Buzz
                 Vector2 connection = Vector2.Lerp(lastConnectionPos, connectionPos, timeStacker);
                 Vector2 handPos = Vector2.Lerp(lastPos, pos, timeStacker);
 
-                float flip = -1f + side * 2f;
-
+                float flip = side;
+                if (small)
+                {
+                    flip = Mathf.Lerp(flip, -Mathf.Sign(graphics.bodyRotation.x), Mathf.Abs(graphics.bodyRotation.x));
+                }
                 float ikX = small ? 3f : 16f;
-                float ikY = small ? 4f : 7f;
+                float ikY = small ? 5f : 7f;
                 Vector2 elbowIK = Custom.InverseKinematic(connection, handPos, ikY, ikX, -flip);
-                ikX = 7f;
-                ikY = 9f;
-                Vector2 wristIK = Custom.InverseKinematic(elbowIK, handPos, ikY, ikX, flip);
+                Vector2 wristIK = Custom.InverseKinematic(elbowIK, handPos, 9f, 5f, flip);
 
-                (sLeaser.sprites[firstSprite] as TriangleMesh).MoveVertice(0, connection - Custom.PerpendicularVector(elbowIK - connection) * flip - camPos);
-                (sLeaser.sprites[firstSprite] as TriangleMesh).MoveVertice(1, connection + Custom.PerpendicularVector(elbowIK - connection) * flip * 2f - camPos);
+                (sLeaser.sprites[firstSprite] as TriangleMesh).MoveVertice(0, connection + -side * Custom.PerpendicularVector(elbowIK - connection) - camPos);
+                (sLeaser.sprites[firstSprite] as TriangleMesh).MoveVertice(1, connection + side * Custom.PerpendicularVector(elbowIK - connection) * 2f - camPos);
                 if (!small)
                 {
                     (sLeaser.sprites[firstSprite] as TriangleMesh).MoveVertice(2, elbowIK - (connection - elbowIK).normalized * flip - camPos);
@@ -274,14 +317,14 @@ namespace BuzzCreature.Objects.Buzz
                     (sLeaser.sprites[firstSprite] as TriangleMesh).MoveVertice(5, elbowIK - Custom.PerpendicularVector(elbowIK - wristIK) * flip * 1.5f - camPos);
                     (sLeaser.sprites[firstSprite] as TriangleMesh).MoveVertice(6, wristIK - Custom.PerpendicularVector(wristIK - elbowIK) * flip * 1.5f - camPos);
                     (sLeaser.sprites[firstSprite] as TriangleMesh).MoveVertice(7, wristIK + Custom.PerpendicularVector(wristIK - elbowIK) * flip * 1.5f - camPos);
-                    (sLeaser.sprites[firstSprite] as TriangleMesh).MoveVertice(8, wristIK + Custom.PerpendicularVector(elbowIK - handPos) * flip * 1.5f - camPos);
-                    (sLeaser.sprites[firstSprite] as TriangleMesh).MoveVertice(9, wristIK - Custom.PerpendicularVector(elbowIK - handPos) * flip - camPos);
-                    (sLeaser.sprites[firstSprite] as TriangleMesh).MoveVertice(10, handPos - camPos);
+                    (sLeaser.sprites[firstSprite] as TriangleMesh).MoveVertice(8, wristIK + Custom.PerpendicularVector(elbowIK - handPos) * flip * 2f - camPos);
+                    (sLeaser.sprites[firstSprite] as TriangleMesh).MoveVertice(9, wristIK - Custom.PerpendicularVector(elbowIK - handPos) * flip * 1.5f - camPos);
+                    (sLeaser.sprites[firstSprite] as TriangleMesh).MoveVertice(10, handPos - Custom.PerpendicularVector(elbowIK - handPos) * flip * 1.5f - camPos);
                 }
                 else
                 {
-                    (sLeaser.sprites[firstSprite] as TriangleMesh).MoveVertice(2, elbowIK - Custom.PerpendicularVector(connection - elbowIK) * flip - camPos);
-                    (sLeaser.sprites[firstSprite] as TriangleMesh).MoveVertice(3, elbowIK + Custom.PerpendicularVector(connection - elbowIK) * flip * 1.5f - camPos);
+                    (sLeaser.sprites[firstSprite] as TriangleMesh).MoveVertice(2, elbowIK + -side * Custom.PerpendicularVector(connection - elbowIK) - camPos);
+                    (sLeaser.sprites[firstSprite] as TriangleMesh).MoveVertice(3, elbowIK + side * Custom.PerpendicularVector(connection - elbowIK) * 1.5f - camPos);
                     (sLeaser.sprites[firstSprite] as TriangleMesh).MoveVertice(4, handPos - camPos);
                 }
 
@@ -300,14 +343,133 @@ namespace BuzzCreature.Objects.Buzz
                         sLeaser.sprites[firstSprite + 3].SetPosition(wristIK - camPos);
                         sLeaser.sprites[firstSprite + 4].SetPosition(handPos - camPos);
                     }
-
                 }
+
+                if (graphics.bodyRotation.y < -0.8f)
+                {
+                    sLeaser.sprites[firstSprite].MoveBehindOtherNode(sLeaser.sprites[graphics.BodySprite]);
+                }
+                else
+                {
+                    sLeaser.sprites[firstSprite].MoveInFrontOfOtherNode(sLeaser.sprites[graphics.BodySprite]);
+                }
+                if (!small)
+                {
+                    if (side == -1)
+                    {
+                        if (graphics.bodyRotation.x < 0.5f)
+                        {
+                            sLeaser.sprites[firstSprite].MoveInFrontOfOtherNode(sLeaser.sprites[graphics.BodySprite]);
+                        }
+                        else if (graphics.bodyRotation.x < 0.8f)
+                        {
+                            sLeaser.sprites[firstSprite].MoveBehindOtherNode(sLeaser.sprites[graphics.BodySprite]);
+                        }
+                        else
+                        {
+                            sLeaser.sprites[firstSprite].MoveBehindOtherNode(sLeaser.sprites[graphics.buttSprites - 1]);
+                        }
+                    }
+                    else
+                    {
+                        if (graphics.bodyRotation.x > -0.5f)
+                        {
+                            sLeaser.sprites[firstSprite].MoveInFrontOfOtherNode(sLeaser.sprites[graphics.BodySprite]);
+                        }
+                        else if (graphics.bodyRotation.x > -0.8f)
+                        {
+                            sLeaser.sprites[firstSprite].MoveBehindOtherNode(sLeaser.sprites[graphics.BodySprite]);
+                        }
+                        else
+                        {
+                            sLeaser.sprites[firstSprite].MoveBehindOtherNode(sLeaser.sprites[graphics.buttSprites - 1]);
+                        }
+                    }
+                }
+
 
             }
 
             public void ApplyPalette(RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam, RoomPalette palette)
             {
                 (sLeaser.sprites[firstSprite] as TriangleMesh).color = palette.blackColor;
+            }
+        }
+        private class BuzzJets : PositionedSmokeEmitter
+        {
+            private BuzzGraphics graphics;
+            public class BuzzSmokeSegment : MeshSmoke.HyrbidSmokeSegment
+            {
+                public int age;
+                public float power;
+
+                public override void Reset(SmokeSystem newOwner, Vector2 pos, Vector2 vel, float lifeTime)
+                {
+                    base.Reset(newOwner, pos, vel, lifeTime);
+                    age = 0;
+                }
+                public override void Update(bool eu)
+                {
+                    base.Update(eu);
+                    age++;
+                }
+                public override Color MyColor(float timeStacker)
+                {
+                    return HSLColor.Lerp(new HSLColor(0.65f, 1f, 0.5f), new HSLColor(0.5f, 0.5f, 0.6f), Mathf.InverseLerp(1f, 6f, (float)age + timeStacker)).rgb;
+                }
+                public override float MyOpactiy(float timeStacker)
+                {
+                    return Mathf.Lerp(1f, 0.8f, Mathf.InverseLerp(2f, 6f, (float)age + timeStacker));
+                }
+                public override float MyRad(float timeStacker)
+                {
+                    return Mathf.Pow(Mathf.Sin(Mathf.Lerp(lastLife, life, timeStacker) * Mathf.PI / 2f + 0.75f), 2f) * power / 2f;
+                }
+                public override float ConDist(float timeStacker)
+                {
+                    return 0.6f;
+                }
+
+                public override void InitiateSprites(RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam)
+                {
+                    base.InitiateSprites(sLeaser, rCam);
+                    sLeaser.sprites[0].shader = rCam.room.game.rainWorld.Shaders["NewVultureSmoke"];
+                    sLeaser.sprites[1].shader = rCam.room.game.rainWorld.Shaders["NewVultureSmoke"];
+                    sLeaser.sprites[2].shader = rCam.room.game.rainWorld.Shaders["FireSmoke"];
+                }
+
+                public override void HybridDraw(RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam, float timeStacker, Vector2 camPos, Vector2 Apos, Vector2 Bpos, Color Acol, Color Bcol, float Arad, float Brad)
+                {
+                    base.HybridDraw(sLeaser, rCam, timeStacker, camPos, Apos, Bpos, Acol, Bcol, Arad, Brad);
+                    sLeaser.sprites[1].color = Acol;
+                    sLeaser.sprites[1].scale = Arad * 8f;
+                    sLeaser.sprites[2].color = Bcol;
+                    sLeaser.sprites[2].scale = Brad;
+                }
+            }
+            public BuzzJets(Room room, BuzzGraphics g) : base(BuzzEnums.BuzzSmoke, room, default, 3, 0f, autoSpawn: false, 2f, -1)
+            {
+                graphics = g;
+            }
+            public override SmokeSystemParticle CreateParticle()
+            {
+                return new BuzzSmokeSegment();
+            }
+
+            public void EmitParticles(Vector2 vel, float power)
+            {
+                if (AddParticle(pos, vel * power, 3f) is BuzzSmokeSegment smokeSegment)
+                {
+                    smokeSegment.power = power;
+                }
+            }
+
+            public void MoveToInternalContainer(int container)
+            {
+                for (int i = 0; i < particles.Count; i++)
+                {
+                    graphics.AddObjectToInternalContainer(particles[i], container);
+                }
             }
         }
 
@@ -317,31 +479,51 @@ namespace BuzzCreature.Objects.Buzz
         public GenericBodyPart head;
 
         public Vector2[,] drawPositions;
+        public Vector2 bodyRotation;
+        public Vector2 lookDirection;
 
         public int totalSprites;
-        public int BodySprite;
-        public int HeadSprite;
-        public int EyeSprite;
+        private int BodySprite;
+        private int HeadSprite;
+        private int EyeSprite;
+        private int JetSprites;
 
-        public int buttSprites;
-        public Vector2[] lastButtPosition;
-        public Vector2[] buttPositions;
-        public float[] buttScales;
-        public float[] lastButtScales;
+        private int buttSprites;
+        private Vector2[] abdomenPositions;
+        private Vector2[] lastAbdomenPositions;
+        private float[] abdomenScales;
+        private float[] lastAbdomenScales;
 
-        public BuzzGraphics(PhysicalObject ow) : base(ow, internalContainers: false)
+        private Vector2[] jetPositions;
+        private Vector2[] lastJetPositions;
+        private Vector2[] jetScales;
+        private Vector2[] lastJetScales;
+        private float[] jetRotations;
+        private float[] lastJetRotations;
+        private BuzzJets[] jetSmoke;
+
+        public BuzzGraphics(PhysicalObject ow) : base(ow, internalContainers: true)
         {
             buzz = ow as Buzz;
             buttSprites = 8;
-            buttPositions = new Vector2[buttSprites];
-            lastButtPosition = new Vector2[buttSprites];
-            buttScales = new float[buttSprites];
-            lastButtScales = new float[buttSprites];
+            abdomenPositions = new Vector2[buttSprites];
+            lastAbdomenPositions = new Vector2[buttSprites];
+            abdomenScales = new float[buttSprites];
+            lastAbdomenScales = new float[buttSprites];
+            jetPositions = new Vector2[4];
+            lastJetPositions = new Vector2[4];
+            jetScales = new Vector2[4];
+            lastJetScales = new Vector2[4];
+            jetRotations = new float[4];
+            lastJetRotations = new float[4];
+            jetSmoke = new BuzzJets[4];
 
             totalSprites = buttSprites;
             BodySprite = totalSprites++;
             HeadSprite = totalSprites++;
             EyeSprite = totalSprites++;
+            JetSprites = totalSprites;
+            totalSprites += 4;
 
             antennae = new(this, totalSprites);
             totalSprites += antennae.totalSprites;
@@ -354,7 +536,7 @@ namespace BuzzCreature.Objects.Buzz
                 {
                     hands[i, j] = new(this, limbNum++, totalSprites);
                     totalSprites += hands[i, j].totalSprites;
-                    hands[i, j].side = i;
+                    hands[i, j].side = -1 + i * 2;
                 }
             }
 
@@ -383,11 +565,22 @@ namespace BuzzCreature.Objects.Buzz
                 }
             }
 
-            this.bodyParts = [ .. bodyParts];
+            this.bodyParts = [.. bodyParts];
+
+            for (int i = 0; i < 4; i++)
+            {
+                jetSmoke[i] = new(buzz.room, this);
+                buzz.room.AddObject(jetSmoke[i]);
+            }
         }
 
         public override void InitiateSprites(RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam)
         {
+            sLeaser.containers = new FContainer[4];
+            for (int i = 0; i < sLeaser.containers.Length; i++)
+            {
+                sLeaser.containers[i] = new FContainer();
+            }
             sLeaser.sprites = new FSprite[totalSprites];
             for (int i = 0; i < buttSprites; i++)
             {
@@ -403,6 +596,11 @@ namespace BuzzCreature.Objects.Buzz
             sLeaser.sprites[HeadSprite].scaleY = 0.5f;
 
             sLeaser.sprites[EyeSprite] = new("buzz0Eye0");
+
+            for (int i = 0; i < 4; i++)
+            {
+                sLeaser.sprites[JetSprites + i] = new("Futile_White");
+            }
 
             for (int i = 0; i < 2; i++)
             {
@@ -424,6 +622,10 @@ namespace BuzzCreature.Objects.Buzz
 
             newContatiner ??= rCam.ReturnFContainer("Midground");
 
+            for (int i = 0; i < sLeaser.containers.Length; i++)
+            {
+                newContatiner.AddChild(sLeaser.containers[i]);
+            }
             for (int i = buttSprites - 1; i >= 0; i--)
             {
                 newContatiner.AddChild(sLeaser.sprites[i]);
@@ -434,31 +636,162 @@ namespace BuzzCreature.Objects.Buzz
             }
 
             antennae.AddToContainer(sLeaser, rCam, newContatiner);
+
         }
 
         public override void DrawSprites(RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam, float timeStacker, Vector2 camPos)
         {
+            bodyRotation = Vector2.Lerp(buzz.lastBodyRotation, buzz.bodyRotation, timeStacker);
+
             Vector2 headPos = Vector2.Lerp(head.lastPos, head.pos, timeStacker);
             Vector2 bodyPos = Vector2.Lerp(drawPositions[0, 1], drawPositions[0, 0], timeStacker);
+            Vector2 lowerBodyPos = Vector2.Lerp(drawPositions[1, 1], drawPositions[1, 0], timeStacker);
 
-            int rotationIndex = Mathf.RoundToInt(Mathf.Clamp(Mathf.Abs(buzz.bodyRotation.x * 4f), 0f, 4f));
+            int rotationIndex = Mathf.RoundToInt(Mathf.Clamp(Mathf.Abs(bodyRotation.x * 4f), 0f, 4f));
 
             sLeaser.sprites[BodySprite].SetElementByName("buzzBody" + rotationIndex);
-            sLeaser.sprites[BodySprite].scaleY = 1.4f + -Mathf.Clamp01(-buzz.bodyRotation.y) * 0.1f;
-            sLeaser.sprites[BodySprite].scaleX = buzz.bodyRotation.x > 0f ? -1.4f : 1.4f;
-            sLeaser.sprites[BodySprite].rotation = -buzz.bodyRotation.x * 10f;
+            sLeaser.sprites[BodySprite].scaleY = 1.4f + -Mathf.Clamp01(bodyRotation.y) * 0.1f;
+            sLeaser.sprites[BodySprite].scaleX = bodyRotation.x > 0f ? -1.4f : 1.4f;
+            sLeaser.sprites[BodySprite].rotation = -bodyRotation.x * 10f;
 
-            sLeaser.sprites[EyeSprite].SetElementByName("buzz" + Mathf.RoundToInt(-Mathf.Clamp01(-buzz.bodyRotation.y) + 1) + "Eye" + rotationIndex);
-            sLeaser.sprites[EyeSprite].scaleX = buzz.bodyRotation.x > 0f ? -1f : 1f;
+            sLeaser.sprites[EyeSprite].SetElementByName("buzz" + Mathf.RoundToInt(Mathf.Clamp01(-bodyRotation.y)) + "Eye" + rotationIndex);
+            sLeaser.sprites[EyeSprite].scaleX = bodyRotation.x > 0f ? -1f : 1f;
 
             for (int i = 0; i < buttSprites; i++)
             {
-                sLeaser.sprites[i].SetPosition(Vector2.Lerp(lastButtPosition[i], buttPositions[i], timeStacker) - camPos);
-                sLeaser.sprites[i].scale = Mathf.Lerp(buttScales[i], lastButtScales[i], timeStacker);
+                sLeaser.sprites[i].SetPosition(Vector2.Lerp(lastAbdomenPositions[i], abdomenPositions[i], timeStacker) - camPos);
+                sLeaser.sprites[i].scale = Mathf.Lerp(lastAbdomenScales[i], abdomenScales[i], timeStacker);
             }
             sLeaser.sprites[BodySprite].SetPosition(bodyPos - camPos);
             sLeaser.sprites[HeadSprite].SetPosition(headPos - camPos);
-            sLeaser.sprites[EyeSprite].SetPosition(headPos - camPos + buzz.lookDirection);
+            sLeaser.sprites[EyeSprite].SetPosition(headPos - camPos + lookDirection);
+            sLeaser.sprites[EyeSprite].y -= Mathf.Clamp01(-bodyRotation.y);
+
+            Vector2 jetLowerPosition = Vector2.Lerp(lastAbdomenPositions[1], abdomenPositions[1], timeStacker);
+
+            for (int i = 0; i < 4; i++)
+            {
+                lastJetPositions[i] = jetPositions[i];
+                lastJetRotations[i] = jetRotations[i];
+            }
+
+            jetPositions[0] = bodyPos + new Vector2(6f, 11f);
+            jetScales[0] = new Vector2(0.6f, 0.4f);
+            jetRotations[0] = 20f;
+
+            jetPositions[1] = bodyPos + new Vector2(-6f, 11f);
+            jetScales[1] = new Vector2(0.6f, 0.4f);
+            jetRotations[1] = -20f;
+
+            jetPositions[2] = jetLowerPosition + new Vector2(11f, -5f);
+            jetScales[2] = new Vector2(0.8f, 0.6f);
+            jetRotations[2] = 44f;
+
+            jetPositions[3] = jetLowerPosition + new Vector2(-11f, -5f);
+            jetScales[3] = new Vector2(0.8f, 0.6f);
+            jetRotations[3] = -44f;
+
+            // X Rotation of Upper Jets
+            //  Right Upper Jets
+            jetPositions[0].x += Mathf.Sin(bodyRotation.x * Mathf.PI / 2f) * 5f;
+            jetPositions[0].y -= Mathf.Lerp(0f, 3f, Mathf.InverseLerp(0f, 1f, Mathf.Abs(bodyRotation.x)));
+            jetRotations[0] = Mathf.Lerp(20f, 85f, Mathf.InverseLerp(0f, 1f, bodyRotation.x));
+
+            //  Left Upper Jets
+            jetPositions[1].x += Mathf.Sin(bodyRotation.x * Mathf.PI / 2f) * 5f;
+            jetPositions[1].y -= Mathf.Lerp(0f, 3f, Mathf.InverseLerp(0f, 1f, Mathf.Abs(bodyRotation.x)));
+            jetRotations[1] = Mathf.Lerp(-20f, -85f, Mathf.InverseLerp(0f, -1f, bodyRotation.x));
+
+            // X Rotation of Lower Jets
+            //  Right Lower Jets
+            jetPositions[2].x += Mathf.Sin(Mathf.Clamp01(bodyRotation.x) * Mathf.PI) * 4f;
+            jetPositions[2].y += Mathf.Sin(Mathf.Abs(bodyRotation.x) * Mathf.PI - Mathf.PI / 2f - Mathf.Cos(Mathf.Abs(bodyRotation.x) * Mathf.PI - Mathf.PI / 2f + Mathf.PI)) * 3f + 3f;
+            jetScales[2].x = Mathf.Lerp(0.8f, 0.9f, Mathf.InverseLerp(0f, 0.5f, Mathf.Pow(Mathf.Clamp01(bodyRotation.x) - (Mathf.Clamp(-bodyRotation.y, 0.5f, 1f) - 0.5f) * 2f, 2f)));
+            jetScales[2].y = Mathf.Lerp(0.6f, 0.7f, Mathf.InverseLerp(0f, 0.7f, Mathf.Pow(Mathf.Clamp01(bodyRotation.x) - (Mathf.Clamp(-bodyRotation.y, 0.5f, 1f) - 0.5f) * 2f, 2f)));
+            jetScales[2].y -= Mathf.Pow(Mathf.Sin((Mathf.Clamp01(bodyRotation.x) - (Mathf.Clamp(-bodyRotation.y, 0.2f, 1f) - 0.2f) * 1.25f) * Mathf.PI) / 2f, 3f);
+            jetRotations[2] = Mathf.Lerp(-Custom.AimFromOneVectorToAnother(lowerBodyPos, jetPositions[2]) / 2f + 15f, 44f, Mathf.InverseLerp(0.4f, 0f, Mathf.Pow(Mathf.Clamp01(bodyRotation.x) - (Mathf.Clamp(-bodyRotation.y, 0.5f, 1f) - 0.5f) * 2f, 2f)));
+            jetRotations[2] -= Mathf.Sin((Mathf.Clamp01(bodyRotation.x) - (Mathf.Clamp(-bodyRotation.y, 0.5f, 1f) - 0.5f) * 2f) * Mathf.PI) * 4f;
+
+            //  Left Lower Jets
+            jetPositions[3].x += Mathf.Sin(-Mathf.Clamp01(-bodyRotation.x) * Mathf.PI) * 4f;
+            jetPositions[3].y += Mathf.Sin(Mathf.Abs(bodyRotation.x) * Mathf.PI - Mathf.PI / 2f - Mathf.Cos(Mathf.Abs(bodyRotation.x) * Mathf.PI - Mathf.PI / 2f + Mathf.PI)) * 3f + 3f;
+            jetScales[3].x = Mathf.Lerp(0.8f, 0.9f, Mathf.InverseLerp(0f, -0.5f, -Mathf.Pow(Mathf.Clamp01(-bodyRotation.x) - (Mathf.Clamp(-bodyRotation.y, 0.5f, 1f) - 0.5f) * 2f, 2f)));
+            jetScales[3].y = Mathf.Lerp(0.6f, 0.7f, Mathf.InverseLerp(0f, -0.7f, -Mathf.Pow(Mathf.Clamp01(-bodyRotation.x) - (Mathf.Clamp(-bodyRotation.y, 0.5f, 1f) - 0.5f) * 2f, 2f)));
+            jetScales[3].y -= Mathf.Pow(Mathf.Sin((Mathf.Clamp01(-bodyRotation.x) - (Mathf.Clamp(-bodyRotation.y, 0.2f, 1f) - 0.2f) * 1.25f) * Mathf.PI) / 2f, 3f);
+            jetRotations[3] = Mathf.Lerp(-Custom.AimFromOneVectorToAnother(lowerBodyPos, jetPositions[3]) / 2f - 15f, -44f, Mathf.InverseLerp(-0.4f, 0f, -Mathf.Pow(Mathf.Clamp01(-bodyRotation.x) - (Mathf.Clamp(-bodyRotation.y, 0.5f, 1f) - 0.5f) * 2f, 2f)));
+            jetRotations[3] += Mathf.Sin((Mathf.Clamp01(-bodyRotation.x) - (Mathf.Clamp(-bodyRotation.y, 0.5f, 1f) - 0.5f) * 2f) * Mathf.PI) * 4f;
+
+            if (bodyRotation.x < -0.1f && bodyRotation.y > 0f)
+            {
+                jetPositions[2].x -= Mathf.Lerp(0f, 15f, Mathf.Lerp(0.1f, 0.5f, Mathf.Clamp01(-bodyRotation.x)));
+                jetRotations[2] += Mathf.Lerp(0f, 140f, Mathf.InverseLerp(0.1f, 0.4f, Mathf.Pow(Mathf.Clamp01(-bodyRotation.x) - (Mathf.Clamp(-bodyRotation.y, 0f, 0.5f)), 2f) * 2f));
+            }
+            else if (bodyRotation.x > 0.1f && bodyRotation.y > 0f)
+            {
+                jetPositions[3].x += Mathf.Lerp(0f, 15f, Mathf.Lerp(0.1f, 0.5f, Mathf.Clamp01(bodyRotation.x)));
+                jetRotations[3] -= Mathf.Lerp(0f, 140f, Mathf.InverseLerp(0.1f, 0.4f, Mathf.Pow(Mathf.Clamp01(bodyRotation.x) - (Mathf.Clamp(-bodyRotation.y, 0f, 0.5f)) * 2f, 2f)));
+            }
+
+            // Y Rotation of Lower Jets
+            //  Right Lower Jets
+            jetPositions[2].x -= Mathf.Lerp(0f, 4f, Mathf.InverseLerp(0f, -1f, bodyRotation.y));
+            jetPositions[2].x -= Mathf.Sin(Mathf.Clamp01(-bodyRotation.y)* Mathf.PI) * 2f;
+            jetPositions[2].y += Mathf.Lerp(0f, 14f, Mathf.InverseLerp(0.2f, -0.8f, bodyRotation.y));
+            jetScales[2].x -= Mathf.Pow(Mathf.Sin((Mathf.Clamp(bodyRotation.y, -0.8f, -0.4f) + 0.4f) * 2.5f * Mathf.PI), 2f) / 2.5f;
+            jetScales[2].y -= Mathf.Lerp(0f, 0.1f, Mathf.InverseLerp(0f, -1f, bodyRotation.y));
+            jetRotations[2] *= Mathf.Lerp(1f, 0f, Mathf.InverseLerp(0f, -0.5f, bodyRotation.y));
+            jetRotations[2] -= Mathf.Lerp(0f, 75f, Mathf.InverseLerp(-0.3f, -0.8f, bodyRotation.y));
+
+            //  Left Lower Jets
+            jetPositions[3].x += Mathf.Lerp(0f, 4f, Mathf.InverseLerp(0f, -1f, bodyRotation.y));
+            jetPositions[3].x += Mathf.Sin(Mathf.Clamp01(-bodyRotation.y) * Mathf.PI) * 2f;
+            jetPositions[3].y += Mathf.Lerp(0f, 14f, Mathf.InverseLerp(0.2f, -0.8f, bodyRotation.y));
+            jetScales[3].x -= Mathf.Pow(Mathf.Sin((Mathf.Clamp(bodyRotation.y, -0.8f, -0.4f) + 0.4f) * 2.5f * Mathf.PI), 2f) / 2.5f;
+            jetScales[3].y -= Mathf.Lerp(0f, 0.1f, Mathf.InverseLerp(0f, -1f, bodyRotation.y));
+            jetRotations[3] *= Mathf.Lerp(1f, 0f, Mathf.InverseLerp(0f, -0.5f, bodyRotation.y));
+            jetRotations[3] += Mathf.Lerp(0f, 75f, Mathf.InverseLerp(-0.3f, -0.8f, bodyRotation.y));
+
+            for (int i = 0; i < 4; i++)
+            {
+                sLeaser.sprites[JetSprites + i].SetPosition(Vector2.Lerp(lastJetPositions[i], jetPositions[i], timeStacker) - camPos);
+                sLeaser.sprites[JetSprites + i].scaleX = jetScales[i].x;
+                sLeaser.sprites[JetSprites + i].scaleY = jetScales[i].y;
+                sLeaser.sprites[JetSprites + i].rotation = Mathf.Lerp(lastJetRotations[i], jetRotations[i], timeStacker);
+            }
+
+            // Sprite Layering
+            if (bodyRotation.x > 0.5f)
+            {
+                sLeaser.sprites[JetSprites + 2].MoveBehindOtherNode(sLeaser.sprites[BodySprite]);
+                sLeaser.sprites[JetSprites].MoveInFrontOfOtherNode(sLeaser.sprites[JetSprites + 2]);
+            }
+            else if (bodyRotation.x < -0.5f)
+            {
+                sLeaser.sprites[JetSprites + 3].MoveBehindOtherNode(sLeaser.sprites[BodySprite]);
+                sLeaser.sprites[JetSprites + 1].MoveInFrontOfOtherNode(sLeaser.sprites[JetSprites + 3]);
+            }
+            else if (bodyRotation.y < 0f)
+            {
+                sLeaser.sprites[JetSprites].MoveBehindOtherNode(sLeaser.sprites[BodySprite]);
+                sLeaser.sprites[JetSprites + 1].MoveBehindOtherNode(sLeaser.sprites[BodySprite]);
+                if (bodyRotation.y < -0.6f)
+                {
+                    sLeaser.sprites[JetSprites + 2].MoveBehindOtherNode(sLeaser.sprites[JetSprites]);
+                    sLeaser.sprites[JetSprites + 3].MoveBehindOtherNode(sLeaser.sprites[JetSprites + 1]);
+                }
+
+            }
+            else
+            {
+                sLeaser.sprites[JetSprites].MoveBehindOtherNode(sLeaser.sprites[BodySprite]);
+                sLeaser.sprites[JetSprites + 1].MoveBehindOtherNode(sLeaser.sprites[BodySprite]);
+                sLeaser.sprites[JetSprites + 2].MoveBehindOtherNode(sLeaser.sprites[buttSprites - 1]);
+                sLeaser.sprites[JetSprites + 3].MoveBehindOtherNode(sLeaser.sprites[buttSprites - 1]);
+            }
+            sLeaser.containers[0].MoveBehindOtherNode(sLeaser.sprites[JetSprites]);
+            sLeaser.containers[1].MoveBehindOtherNode(sLeaser.sprites[JetSprites + 1]);
+            sLeaser.containers[2].MoveBehindOtherNode(sLeaser.sprites[JetSprites + 2]);
+            sLeaser.containers[3].MoveBehindOtherNode(sLeaser.sprites[JetSprites + 3]);
 
             for (int i = 0; i < 2; i++)
             {
@@ -481,8 +814,13 @@ namespace BuzzCreature.Objects.Buzz
             {
                 sLeaser.sprites[i].color = Color.Lerp(color, blackColor, (float)i / (float)buttSprites * 0.5f);
             }
-            sLeaser.sprites[BodySprite].color = Color.gray;
+            sLeaser.sprites[BodySprite].color = Color.Lerp(color, blackColor, 0.5f);
             sLeaser.sprites[EyeSprite].color = blackColor;
+
+            sLeaser.sprites[JetSprites].color = Color.blue;
+            sLeaser.sprites[JetSprites + 1].color = Color.blue;
+            sLeaser.sprites[JetSprites + 2].color = Color.red;
+            sLeaser.sprites[JetSprites + 3].color = Color.red;
 
             for (int i = 0; i < 2; i++)
             {
@@ -498,6 +836,7 @@ namespace BuzzCreature.Objects.Buzz
 
         public override void Update()
         {
+            lookDirection = buzz.lookDirection;
 
             for (int i = 0; i < buzz.bodyChunks.Length; i++)
             {
@@ -505,29 +844,29 @@ namespace BuzzCreature.Objects.Buzz
                 drawPositions[i, 0] = buzz.bodyChunks[i].pos;
             }
 
-            drawPositions[0, 0] += buzz.lookDirection * 0.5f;
-            drawPositions[0, 0].y += Mathf.Clamp01(buzz.bodyRotation.y) + Mathf.Abs(buzz.bodyRotation.x * 4f);
+            drawPositions[0, 0] += lookDirection * 0.5f;
+            drawPositions[0, 0].y += -Mathf.Clamp01(-bodyRotation.y) + Mathf.Abs(bodyRotation.x * 4f);
 
-            head.vel += buzz.lookDirection * 2f;
+            head.vel += lookDirection * 2f;
 
             head.Update();
             head.ConnectToPoint(Vector2.Lerp(drawPositions[0, 0], drawPositions[0, 1], 0.2f), 2f, push: true, 0.6f, buzz.bodyChunks[0].vel, 0.7f, 0.2f);
 
-            head.pos.x += buzz.bodyRotation.x * -6f;
-            head.pos.y += -buzz.bodyRotation.y + Mathf.Abs(buzz.bodyRotation.x * 4f);
+            head.pos.x += bodyRotation.x * -6f;
+            head.pos.y += bodyRotation.y + Mathf.Abs(bodyRotation.x * 4f);
 
-            for (int i = 0; i < buttPositions.Length; i++)
+            for (int i = 0; i < abdomenPositions.Length; i++)
             {
-                float pos = (float)i / (float)buttPositions.Length;
-                lastButtPosition[i] = buttPositions[i];
-                buttPositions[i] = (Vector2)Vector3.Slerp(buzz.bodyChunks[0].pos, buzz.bodyChunks[1].pos, pos);
-                buttPositions[i].y -= Mathf.Sin(pos * Mathf.PI * (-Mathf.Abs(buzz.bodyRotation.x) + buzz.bodyRotation.y)) * 3f;
+                float pos = (float)i / (float)abdomenPositions.Length;
+                lastAbdomenPositions[i] = abdomenPositions[i];
+                abdomenPositions[i] = (Vector2)Vector3.Slerp(buzz.bodyChunks[0].pos, buzz.bodyChunks[1].pos, pos);
+                abdomenPositions[i].y -= Mathf.Sin(pos * Mathf.PI * (-Mathf.Abs(bodyRotation.x) - bodyRotation.y)) * 3f;
             }
-            for (int i = 0; i < buttPositions.Length; i++)
+            for (int i = 0; i < abdomenPositions.Length; i++)
             {
-                float pos = (float)i / (float)buttPositions.Length;
-                lastButtScales[i] = buttScales[i];
-                buttScales[i] = 0.7f + Mathf.Sin(pos * Mathf.PI - 0.4f);
+                float pos = (float)i / (float)abdomenPositions.Length;
+                lastAbdomenScales[i] = abdomenScales[i];
+                abdomenScales[i] = 0.7f + Mathf.Sin(pos * Mathf.PI - 0.4f);
             }
 
             for (int i = 0; i < 2; i++)
@@ -537,6 +876,18 @@ namespace BuzzCreature.Objects.Buzz
                     hands[i, j].Update();
                 }
             }
+            jetSmoke[0].MoveToInternalContainer(0);
+            jetSmoke[0].MoveTo(jetPositions[0] + Custom.DegToVec(jetRotations[0]), buzz.evenUpdate);
+            jetSmoke[0].EmitParticles(Custom.DegToVec(jetRotations[0]), 2f);
+            jetSmoke[1].MoveToInternalContainer(1);
+            jetSmoke[1].MoveTo(jetPositions[1] + Custom.DegToVec(jetRotations[1]), buzz.evenUpdate);
+            jetSmoke[1].EmitParticles(Custom.DegToVec(jetRotations[1]), 2f);
+            jetSmoke[2].MoveToInternalContainer(2);
+            jetSmoke[2].MoveTo(jetPositions[2] + -Custom.PerpendicularVector(Custom.DegToVec(jetRotations[2])), buzz.evenUpdate);
+            jetSmoke[2].EmitParticles(-Custom.PerpendicularVector(Custom.DegToVec(jetRotations[2])), 5f);
+            jetSmoke[3].MoveToInternalContainer(3);
+            jetSmoke[3].EmitParticles(Custom.PerpendicularVector(Custom.DegToVec(jetRotations[3])), 5f);
+            jetSmoke[3].MoveTo(jetPositions[3] + Custom.PerpendicularVector(Custom.DegToVec(jetRotations[3])), buzz.evenUpdate);
 
             antennae.Update();
             base.Update();
