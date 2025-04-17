@@ -83,7 +83,7 @@ namespace BuzzCreature.Objects.Buzz
 
             if (behavior == Behavior.Idle)
             {
-                IdleBehavior();
+               //IdleBehavior();
             }
             else if (behavior == Behavior.Flee)
             {

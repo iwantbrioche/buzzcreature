@@ -67,6 +67,11 @@ namespace BuzzCreature.Objects.Buzz
             Relationships relationships = new(BuzzEnums.Buzz);
 
             relationships.IsInPack(BuzzEnums.Buzz, 1f);
+
+            relationships.Fears(CreatureTemplate.Type.Vulture, 1f);
+
+            relationships.EatenBy(CreatureTemplate.Type.Vulture, 1f);
+
         }
 
         public override ArtificialIntelligence CreateRealizedAI(AbstractCreature acrit)
