@@ -4,18 +4,19 @@ using System.Drawing;
 
 namespace BuzzCreature.Objects.Buzz
 {
-    public class BuzzAI : ArtificialIntelligence, IUseARelationshipTracker, IReactToSocialEvents, FriendTracker.IHaveFriendTracker, ILookingAtCreatures
+    public class BuzzAI : ArtificialIntelligence, IUseARelationshipTracker, IUseItemTracker, IReactToSocialEvents, FriendTracker.IHaveFriendTracker, ILookingAtCreatures
     {
         public class Behavior(string value, bool register = false) : ExtEnum<Behavior>(value, register)
         {
             public static readonly Behavior Idle = new("Idle", register: true);
             public static readonly Behavior Flee = new("Flee", register: true);
+            public static readonly Behavior SearchForItems = new("SearchForItems", register: true);
         }
 
         public Buzz buzz;
         public Behavior behavior;
         public Tracker.CreatureRepresentation focusCreature;
-        public CreatureLooker creatureLooker;
+        public CreatureLooker creatureLooker; // 👀
 
         public WorldCoordinate idlePos;
         public WorldCoordinate lastIdlePos;
@@ -38,24 +39,28 @@ namespace BuzzCreature.Objects.Buzz
             pathFinder.accessibilityStepsPerFrame = 60;
             AddModule(new Tracker(this, 5, 10, 450, 0.5f, 5, 5, 10));
             AddModule(new ThreatTracker(this, 3));
+            AddModule(new ItemTracker(this, 10, 10, -1, -1, stopTrackingCarried: true));
             AddModule(new StuckTracker(this, trackPastPositions: true, trackNotFollowingCurrentGoal: true));
             AddModule(new RelationshipTracker(this, tracker));
             AddModule(new UtilityComparer(this));
             stuckTracker.AddSubModule(new StuckTracker.GetUnstuckPosCalculator(stuckTracker));
-            utilityComparer.AddComparedModule(threatTracker, null, 1f, 1.1f);
+            utilityComparer.AddComparedModule(threatTracker, null, 1.1f, 1.1f);
             utilityComparer.AddComparedModule(stuckTracker, null, 1f, 1.1f);
-            creatureLooker = new(this, tracker, buzz, 0.4f, 20);
+            creatureLooker = new(this, tracker, buzz, 0.8f, 20);
             behavior = Behavior.Idle;
             oldIdlePositions = [];
 
-            debugDestinationVisualizer = new(world.game.abstractSpaceVisualizer, world, pathFinder, Color.red);
-            debugTrackerVisualizer = new(tracker);
+            //debugDestinationVisualizer = new(world.game.abstractSpaceVisualizer, world, pathFinder, Color.red);
+            //debugTrackerVisualizer = new(tracker);
+            //itemTracker.visualize = true;
+            //pathFinder.visualize = true;
+            pathFinder.visualizePath = true;
         }
 
         public override void Update()
         {
-            //debugDestinationVisualizer?.Update();
-            //debugTrackerVisualizer?.Update();
+            debugDestinationVisualizer?.Update();
+            debugTrackerVisualizer?.Update();
 
             if (buzz.room.game.devToolsActive && Input.GetMouseButton(2))
             {
@@ -69,21 +74,25 @@ namespace BuzzCreature.Objects.Buzz
             AIModule aiModule = utilityComparer.HighestUtilityModule();
             currentUtility = utilityComparer.HighestUtility();
 
-            if (aiModule != null)
-            {
-                if (aiModule is ThreatTracker)
-                {
-                    behavior = Behavior.Flee;
-                }
-            }
-            if (currentUtility < 0.1f)
-            {
-                behavior = Behavior.Idle;
-            }
+
+            //if (aiModule != null)
+            //{
+            //    if (aiModule is ThreatTracker)
+            //    {
+            //        behavior = Behavior.Flee;
+            //    }
+            //}
+            //if (currentUtility < 0.1f)
+            //{
+            //    behavior = Behavior.Idle;
+            //}
 
             if (behavior == Behavior.Idle)
             {
-               //IdleBehavior();
+                //if (itemTracker.ItemCount > 0)
+                //{
+                //    behavior = Behavior.SearchForItems;
+                //}
             }
             else if (behavior == Behavior.Flee)
             {
@@ -94,12 +103,27 @@ namespace BuzzCreature.Objects.Buzz
                 }
                 creature.abstractAI.SetDestination(destination);
             }
+            else if (behavior == Behavior.SearchForItems)
+            {
+                if (itemTracker.ItemCount > 0)
+                {
+                    //DebugDrawing.DrawLine(buzz.room, buzz.firstChunk.pos, buzz.room.MiddleOfTile(itemTracker.items[0].BestGuessForPosition()), Color.red);
+                    //creature.abstractAI.SetDestination(itemTracker.items[0].BestGuessForPosition());
+                }
+                else
+                {
+                    behavior = Behavior.Idle;
+                }
+            }
+
+            DebugDrawing.DrawText(buzz.room, behavior.value, buzz.firstChunk.pos + new Vector2(15f, 30f), Color.white);
 
             base.Update();
         }
 
         public void IdleBehavior()
         {
+            // taken from squidcadas
             Vector2 pos = Random.value < 0.5f ? buzz.room.MiddleOfTile(idlePos) + Custom.RNV() * Random.value * 400f : buzz.mainBodyChunk.pos + Custom.RNV() * Random.value * 400f;
             if (IdleScore(buzz.room.GetWorldCoordinate(pos)) < IdleScore(idlePos))
             {
@@ -189,6 +213,15 @@ namespace BuzzCreature.Objects.Buzz
         public Tracker.CreatureRepresentation ForcedLookCreature()
         {
             return buzz.AI.focusCreature;
+        }
+
+        public bool TrackItem(AbstractPhysicalObject obj)
+        {
+            return true;
+        }
+
+        public void SeeThrownWeapon(PhysicalObject obj, Creature thrower)
+        {
         }
     }
 }

@@ -34,12 +34,14 @@ namespace BuzzCreature
         public const string MOD_ID = "iwantbread.buzzcreature";
         public const string MOD_NAME = "Buzz Creature";
         public const string MOD_VER = "0.0";
-        private const string ATLASES_DIR = "buzzAtlases";
+        //private const string ATLASES_DIR = "buzzAtlases";
         public static new ManualLogSource Logger { get; private set; }
         private void OnEnable()
         {
             BuzzEnums.Register();
             Content.Register(new BuzzCritob());
+
+            Hooks.Hooks.PatchHooks();
 
             On.RainWorld.OnModsInit += RainWorld_OnModsInit;
             On.RainWorld.PostModsInit += RainWorld_PostModsInit;
@@ -56,9 +58,9 @@ namespace BuzzCreature
             {
                 if (IsInit) return;
 
-                Hooks.Hooks.PatchHooks();
 
-                LoadAtlases();
+                Futile.atlasManager.LoadAtlas("buzzAtlases/BuzzBodyAtlas");
+                Futile.atlasManager.LoadAtlas("buzzAtlases/BuzzEyeAtlas");
 
                 IsInit = true;
             }
@@ -66,7 +68,7 @@ namespace BuzzCreature
             {
                 Logger.LogError($"{MOD_NAME} failed to load!");
                 Logger.LogError(ex);
-                throw;
+                //throw;
             }
         }
 
@@ -83,35 +85,35 @@ namespace BuzzCreature
             {
                 Logger.LogError($"{MOD_NAME} PostModsInit failed to load!");
                 Logger.LogError(ex);
-                throw;
+                //throw;
             }
         }
 
-        private static void LoadAtlases()
-        {
-            string[] atlasPaths = AssetManager.ListDirectory(ATLASES_DIR);
-            foreach (string filePath in atlasPaths)
-            {
-                if (Path.GetExtension(filePath) == ".txt")
-                {
-                    string atlasName = Path.GetFileNameWithoutExtension(filePath);
-                    try
-                    {
-                        Logger.LogDebug($"loading {ATLASES_DIR + Path.AltDirectorySeparatorChar + atlasName} atlas!");
+        //private static void LoadAtlases()
+        //{
+        //    string[] atlasPaths = AssetManager.ListDirectory(ATLASES_DIR);
+        //    foreach (string filePath in atlasPaths)
+        //    {
+        //        if (Path.GetExtension(filePath) == ".txt")
+        //        {
+        //            string atlasName = Path.GetFileNameWithoutExtension(filePath);
+        //            try
+        //            {
+        //                Logger.LogDebug($"loading {ATLASES_DIR + Path.AltDirectorySeparatorChar + atlasName} atlas!");
 
-                        Futile.atlasManager.LoadAtlas(ATLASES_DIR + Path.AltDirectorySeparatorChar + atlasName);
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.LogError($"Error while loading {MOD_NAME} atlases!");
-                        Logger.LogError(ex);
-                        throw;
-                    }
-                }
-            }
+        //                Futile.atlasManager.LoadAtlas(ATLASES_DIR + Path.AltDirectorySeparatorChar + atlasName);
+        //            }
+        //            catch (Exception ex)
+        //            {
+        //                Logger.LogError($"Error while loading {MOD_NAME} atlases!");
+        //                Logger.LogError(ex);
+        //                throw;
+        //            }
+        //        }
+        //    }
 
-            Logger.LogInfo($"Loaded {MOD_NAME} atlases successfully!");
-        }
+        //    Logger.LogInfo($"Loaded {MOD_NAME} atlases successfully!");
+        //}
 
     }
 }

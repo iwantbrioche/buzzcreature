@@ -11,16 +11,15 @@ namespace BuzzCreature.Objects.Buzz
 
         public BuzzAI AI;
         public MovementMode movementMode;
-        public Vector2 moveDir;
+        public Vector2 moveDestination;
         public Vector2 thrustVel;
         public Vector2 lookDirection;
         public Vector2 bodyRotation;
         public Vector2 lastBodyRotation;
         public float sinCounter;
-        public float jetPower = 1f;
+        public float jetPower = 0f;
 
         private bool debugVis = false;
-        private DebugSprite debugDirSprite;
         public Buzz(AbstractCreature abstractCreature, World world) : base(abstractCreature, world)
         {
             bodyChunks = new BodyChunk[2];
@@ -42,11 +41,10 @@ namespace BuzzCreature.Objects.Buzz
 
             if (debugVis)
             {
-                debugDirSprite = new(default, new FSprite("pixel"), abstractCreature.realizedCreature.room);
-                debugDirSprite.sprite.anchorY = 0f;
-                debugDirSprite.sprite.scaleX = 2f;
-                debugDirSprite.sprite.color = Color.green;
+
             }
+
+                
         }
 
         public override void InitiateGraphicsModule()
@@ -59,11 +57,7 @@ namespace BuzzCreature.Objects.Buzz
             base.NewRoom(newRoom);
             if (debugVis)
             {
-                if (debugDirSprite.room != newRoom)
-                {
-                    debugDirSprite.RemoveFromRoom();
-                    newRoom.AddObject(debugDirSprite);
-                }
+
             }
         }
 
@@ -101,7 +95,6 @@ namespace BuzzCreature.Objects.Buzz
 
             Act();
         }
-
         public void Act()
         {
             AI.Update();
@@ -119,6 +112,7 @@ namespace BuzzCreature.Objects.Buzz
             if (Consious)
             {
                 MovementConnection movementConnection = pather.FollowPath(room.GetWorldCoordinate(mainBodyChunk.pos), true);
+                DebugDrawing.DrawText(room, movementConnection.ToString(), firstChunk.pos + new Vector2(15f, 15f), Color.white);
                 if (movementConnection != default)
                 {
                     // Shortcuts and NPCTransport
@@ -133,23 +127,24 @@ namespace BuzzCreature.Objects.Buzz
                     }
                     else
                     {
-                        moveDir = room.MiddleOfTile(movementConnection.destinationCoord);
+                        // Gives the average of connection positions for the buzz to follow
+                        moveDestination = room.MiddleOfTile(movementConnection.destinationCoord);
                         MovementConnection pathConnection = movementConnection;
                         int pathNum = 1;
 
-                        for (int i = 0; i < 4; i++)
+                        for (int i = 0; i < 5; i++)
                         {
                             pathConnection = pather.FollowPath(movementConnection.destinationCoord, false);
 
                             if (pathConnection == default) break;
-                            moveDir += room.MiddleOfTile(pathConnection.destinationCoord);
+                            moveDestination += room.MiddleOfTile(pathConnection.destinationCoord);
                             pathNum++;
                         }
-                        moveDir /= pathNum;
+                        moveDestination /= pathNum;
 
                         if (enteringShortCut.HasValue)
                         {
-                            moveDir = room.MiddleOfTile(enteringShortCut.Value);
+                            moveDestination = room.MiddleOfTile(enteringShortCut.Value);
                         }
 
                         if (movementMode == MovementMode.Flying)
@@ -163,17 +158,6 @@ namespace BuzzCreature.Objects.Buzz
 
                             bodyChunks[0].vel.y += 0.8f;
 
-                            // Keep away from terrain while flying
-                            if (room.aimap.getTerrainProximity(moveDir) == 1 && !room.aimap.getAItile(moveDir).narrowSpace && !enteringShortCut.HasValue)
-                            {
-                                for (int i = 0; i < 4; i++)
-                                {
-                                    if (room.GetTile(room.GetTilePosition(moveDir) + Custom.fourDirections[i]).Solid)
-                                    {
-                                        moveDir -= Custom.fourDirections[i].ToVector2() * 15f;
-                                    }
-                                }
-                            }
 
                             float accel = 1f;
                             if (AI.pathFinder.GetDestination.room == room.abstractRoom.index && Custom.DistLess(room.MiddleOfTile(AI.pathFinder.destination.Tile), mainBodyChunk.pos, 30f) && AI.VisualContact(room.MiddleOfTile(AI.pathFinder.destination.Tile), 0f))
@@ -182,40 +166,47 @@ namespace BuzzCreature.Objects.Buzz
                                 accel *= Mathf.Lerp(0.2f, 1f, Mathf.InverseLerp(0f, 40f, Vector2.Distance(room.MiddleOfTile(AI.pathFinder.destination.Tile), mainBodyChunk.pos)));
                             }
 
-                            thrustVel = Vector2.ClampMagnitude(moveDir - bodyChunks[0].pos, 20f) / 15f * 1.75f * accel;
+                            DebugDrawing.DrawLine(room, firstChunk.pos, moveDestination, Color.red, 2f);
+                            thrustVel = Vector2.ClampMagnitude(moveDestination - bodyChunks[0].pos, 20f) / 15f * 1.75f * accel;
 
 
                             // Slow down passively and float
                             bodyChunks[0].vel *= 0.95f;
-                            bodyChunks[1].vel *= 0.85f;
                             bodyChunks[0].vel.y += gravity * Mathf.Lerp(0.9f, -1.3f, Mathf.InverseLerp(-0.4f, -2f, thrustVel.y) / 1.5f + Mathf.InverseLerp(0.3f, 1f, Mathf.Abs(thrustVel.x)) / 2f);
+                            bodyChunks[1].vel *= 0.85f;
                             bodyChunks[1].vel.y += gravity * Mathf.Lerp(0.6f, -0.9f, Mathf.InverseLerp(-0.4f, -2f, thrustVel.y) / 1.5f + Mathf.InverseLerp(0.3f, 1f, Mathf.Abs(thrustVel.x)) / 2f);
 
-                            // Go towards destPos
-                            bodyChunks[0].vel += thrustVel;
+                            // Go towards destination
+                            bodyChunks[0].vel += thrustVel * jetPower;
 
                             // Rotate butt away from lookDir
                             bodyChunks[1].vel -= lookDirection * 0.1f;
+
+                            jetPower = Mathf.Lerp(jetPower, 1f, 0.5f);
 
                             if (Custom.DistLess(bodyChunks[1].pos, bodyChunks[0].pos, 10f))
                             {
                                 bodyChunks[1].vel -= Custom.DirVec(bodyChunks[1].pos, bodyChunks[0].pos) + new Vector2(Random.value, 0f);
                                 bodyChunks[0].vel += Custom.DirVec(bodyChunks[1].pos, bodyChunks[0].pos) + new Vector2(Random.value, 0f);
                             }
-
-                            if (debugVis)
-                            {
-                                debugDirSprite.pos = bodyChunks[0].pos;
-                                debugDirSprite.sprite.rotation = Custom.AimFromOneVectorToAnother(bodyChunks[0].pos, moveDir);
-                                debugDirSprite.sprite.scaleY = Vector2.Distance(bodyChunks[0].pos, moveDir);
-                                debugDirSprite.Update(evenUpdate);
-                            }
                         }
                         else if (movementMode == MovementMode.Crawl)
                         {
+                            jetPower = Mathf.Lerp(jetPower, 0f, 0.5f);
 
+                            bodyChunks[0].vel *= 0.8f;
+                            bodyChunks[0].vel.y += gravity;
+                            bodyChunks[1].vel *= 0.8f;
+                            bodyChunks[1].vel.y += gravity;
+
+                            bodyChunks[0].vel += Custom.DirVec(bodyChunks[0].pos, room.MiddleOfTile(movementConnection.destinationCoord));
                         }
                         else
+                        {
+
+                        }
+
+                        if (debugVis)
                         {
 
                         }
@@ -223,5 +214,7 @@ namespace BuzzCreature.Objects.Buzz
                 }
             }
         }
+
+
     }
 }

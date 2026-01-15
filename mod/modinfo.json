@@ -2,7 +2,7 @@
   "id": "iwantbread.buzzcreature",
   "name": "Buzz Creature",
   "version": "0.0",
-  "target_game_version": "v1.10",
+  "target_game_version": "v1.11",
   "authors": "",
   "description": "",
   "requirements": ["fisobs"],

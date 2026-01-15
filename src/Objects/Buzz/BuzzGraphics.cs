@@ -10,7 +10,7 @@ namespace BuzzCreature.Objects.Buzz
      * old colors
      * longer antennae
      * floppier antennae
-     */
+     */ 
     public class BuzzGraphics : GraphicsModule
     {
         private class BuzzAntennae
@@ -130,11 +130,13 @@ namespace BuzzCreature.Objects.Buzz
 
             public void ApplyPalette(RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam, RoomPalette palette)
             {
+                Color blackColor = Color.Lerp(palette.blackColor, graphics.darkColor, 0.5f);
+                Color antennaeColor = Color.Lerp(blackColor, graphics.lightColor, 0.1f);
                 for (int i = 0; i < 2; i++)
                 {
                     for (int j = 0; j < segments; j++)
                     {
-                        sLeaser.sprites[AntennaSprite(i, j)].color = Color.Lerp(Color.Lerp(palette.blackColor, graphics.baseColor, 0.2f), graphics.lightColor, Mathf.Pow((float)j / (float)segments, 0.5f));
+                        sLeaser.sprites[AntennaSprite(i, j)].color = Color.Lerp(blackColor, antennaeColor, Mathf.Pow((float)j / (float)segments, 0.5f));
                     }
                 }
             }
@@ -355,7 +357,7 @@ namespace BuzzCreature.Objects.Buzz
                     }
                 }
 
-                if (graphics.bodyRotation.y < -0.8f)
+                if (graphics.bodyRotation.y < -0.7f)
                 {
                     sLeaser.sprites[firstSprite].MoveBehindOtherNode(sLeaser.sprites[graphics.BodySprite]);
                 }
@@ -402,7 +404,12 @@ namespace BuzzCreature.Objects.Buzz
 
             public void ApplyPalette(RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam, RoomPalette palette)
             {
-                (sLeaser.sprites[firstSprite] as TriangleMesh).color = palette.blackColor;
+                Color blackColor = Color.Lerp(palette.blackColor, graphics.darkColor, 0.5f);
+                for (int i = 0; i < (sLeaser.sprites[firstSprite] as TriangleMesh).verticeColors.Length; i++)
+                {
+                    float t = (float)i / (float)((sLeaser.sprites[firstSprite] as TriangleMesh).verticeColors.Length - 1);
+                    (sLeaser.sprites[firstSprite] as TriangleMesh).verticeColors[i] = Color.Lerp(blackColor, Color.Lerp(graphics.bodyColor, Color.white, 0.7f), Mathf.Pow(t, 1.5f));
+                }
             }
         }
         private class BuzzJets : PositionedSmokeEmitter
@@ -426,11 +433,14 @@ namespace BuzzCreature.Objects.Buzz
                 }
                 public override Color MyColor(float timeStacker)
                 {
-                    return JetSmokeColor(Mathf.InverseLerp(1f, 6f, (float)age + timeStacker));
+                    return JetSmokeColor(Mathf.InverseLerp(6f, 1f, (float)age + timeStacker));
                 }
                 public Color JetSmokeColor(float lrp)
                 {
-                    HSLColor baseColor = HSLColor.Lerp(new HSLColor(0.65f, 1f, 0.5f), new HSLColor(0.5f, 0.5f, 0.6f), lrp);
+                    HSLColor baseColor = HSLColor.Lerp(new HSLColor(0.65f, 1f, 0.5f), new HSLColor(0.5f, 0.5f, 0.6f), lrp); //blue color
+                    //HSLColor baseColor = HSLColor.Lerp(new HSLColor(0.25f, 1f, 0.3f), new HSLColor(0.15f, 0.7f, 0.6f), lrp); //green color
+                    //HSLColor baseColor = HSLColor.Lerp(new HSLColor(0.1f, 1f, 0.5f), new HSLColor(0.13f, 1f, 0.65f), lrp); //yellow color
+
                     return baseColor.rgb;
                 }
                 public override float MyOpactiy(float timeStacker)
@@ -465,7 +475,7 @@ namespace BuzzCreature.Objects.Buzz
                     sLeaser.sprites[1].rotation = Custom.AimFromOneVectorToAnother(pos, pos + vel);
                     sLeaser.sprites[2].alpha = Mathf.Pow(Bcol.a, 1.1f);
                     Bcol.a = 1f;
-                    sLeaser.sprites[2].color = Color.Lerp(Bcol, Color.white, Mathf.InverseLerp(1f, 0.2f, Mathf.Lerp(lastLife, life, timeStacker)) * 0.65f);
+                    sLeaser.sprites[2].color = Color.Lerp(Bcol, Color.white, Mathf.InverseLerp(0f, 0.8f, Mathf.Lerp(lastLife, life, timeStacker)) * 0.85f);
                     sLeaser.sprites[2].scale = Brad / 3f;
                     sLeaser.sprites[2].scaleY *= 1.5f;
                     sLeaser.sprites[2].rotation = Custom.AimFromOneVectorToAnother(pos, pos + vel);
@@ -497,6 +507,19 @@ namespace BuzzCreature.Objects.Buzz
             }
         }
 
+        private struct JetData
+        {
+            public Vector2 pos;
+            public Vector2 lastPos;
+            public Vector2 scale;
+            public Vector2 lastScale;
+            public float rotation;
+            public float lastRotation;
+            public float flamePower;
+            public float lastFlamePower;
+            public BuzzJets smoke;
+        }
+
         private Buzz buzz;
         private BuzzAntennae antennae;
         private BuzzHand[,] hands;
@@ -518,18 +541,11 @@ namespace BuzzCreature.Objects.Buzz
         private float[] abdomenScales;
         private float[] lastAbdomenScales;
 
-        private Vector2[] jetPositions;
-        private Vector2[] lastJetPositions;
-        private Vector2[] jetScales;
-        private Vector2[] lastJetScales;
-        private float[] jetRotations;
-        private float[] lastJetRotations;
-        private float[] jetFlamePowers;
-        private float[] lastJetFlamePowers;
-        private BuzzJets[] jetSmoke;
+        private JetData[] jetData;
 
-        public Color baseColor;
+        public Color bodyColor;
         public Color lightColor;
+        public Color darkColor;
 
 
         public BuzzGraphics(PhysicalObject ow) : base(ow, internalContainers: true)
@@ -540,15 +556,7 @@ namespace BuzzCreature.Objects.Buzz
             lastAbdomenPositions = new Vector2[buttSprites];
             abdomenScales = new float[buttSprites];
             lastAbdomenScales = new float[buttSprites];
-            jetPositions = new Vector2[4];
-            lastJetPositions = new Vector2[4];
-            jetScales = new Vector2[4];
-            lastJetScales = new Vector2[4];
-            jetRotations = new float[4];
-            lastJetRotations = new float[4];
-            jetFlamePowers = new float[4];
-            lastJetFlamePowers = new float[4];
-            jetSmoke = new BuzzJets[4];
+            jetData = new JetData[4];
 
             totalSprites = buttSprites;
             BodySprite = totalSprites++;
@@ -602,8 +610,8 @@ namespace BuzzCreature.Objects.Buzz
 
             for (int i = 0; i < 4; i++)
             {
-                jetSmoke[i] = new(buzz.room, this);
-                buzz.room.AddObject(jetSmoke[i]);
+                jetData[i].smoke = new(buzz.room, this);
+                buzz.room.AddObject(jetData[i].smoke);
             }
         }
 
@@ -625,17 +633,13 @@ namespace BuzzCreature.Objects.Buzz
             sLeaser.sprites[BodySprite] = new("buzzBody0");
 
             sLeaser.sprites[HeadSprite] = new("Circle20");
-            sLeaser.sprites[HeadSprite].scaleX = 0.55f;
-            sLeaser.sprites[HeadSprite].scaleY = 0.5f;
+            sLeaser.sprites[HeadSprite].scaleX = 0.65f;
+            sLeaser.sprites[HeadSprite].scaleY = 0.6f;
 
-            sLeaser.sprites[EyeSprites] = new("Futile_White");
-            sLeaser.sprites[EyeSprites].shader = Custom.rainWorld.Shaders["JaggedCircle"];
-            sLeaser.sprites[EyeSprites].alpha = 1f;
-            sLeaser.sprites[EyeSprites].scale = 0.27f;
-            sLeaser.sprites[EyeSprites + 1] = new("Futile_White");
-            sLeaser.sprites[EyeSprites + 1].shader = Custom.rainWorld.Shaders["JaggedCircle"];
-            sLeaser.sprites[EyeSprites + 1].alpha = 1f;
-            sLeaser.sprites[EyeSprites + 1].scale = 0.27f;
+            sLeaser.sprites[EyeSprites] = new("Circle20");
+            sLeaser.sprites[EyeSprites].scale = 0.19f;
+            sLeaser.sprites[EyeSprites + 1] = new("Circle20");
+            sLeaser.sprites[EyeSprites + 1].scale = 0.19f;
 
             for (int i = 0; i < 4; i++)
             {
@@ -702,106 +706,107 @@ namespace BuzzCreature.Objects.Buzz
             }
             sLeaser.sprites[BodySprite].SetPosition(bodyPos - camPos);
             sLeaser.sprites[HeadSprite].SetPosition(headPos - camPos);
+            sLeaser.sprites[HeadSprite].scaleX = Mathf.Lerp(0.55f, 0.5f, Mathf.InverseLerp(0.2f, 0.6f, Mathf.Abs(bodyRotation.x)));
 
-            sLeaser.sprites[EyeSprites].SetPosition(headPos + new Vector2(3f, 0f) - camPos + lookDirection);
-            sLeaser.sprites[EyeSprites].x -= bodyRotation.x * 3f;
+            sLeaser.sprites[EyeSprites].SetPosition(headPos + new Vector2(3.5f, -1f) - camPos + lookDirection);
+            sLeaser.sprites[EyeSprites].x -= bodyRotation.x * 2f + Mathf.Clamp01(bodyRotation.x);
             sLeaser.sprites[EyeSprites].y -= Mathf.Clamp01(-bodyRotation.y);
-            sLeaser.sprites[EyeSprites].scaleX = Mathf.Lerp(0.27f, 0f, Mathf.InverseLerp(-0.2f, -0.6f, bodyRotation.x));
-            sLeaser.sprites[EyeSprites + 1].SetPosition(headPos - new Vector2(3f, 0f) - camPos + lookDirection);
-            sLeaser.sprites[EyeSprites + 1].x -= bodyRotation.x * 3f;
+            sLeaser.sprites[EyeSprites].scaleX = Mathf.Lerp(0.19f, 0f, Mathf.InverseLerp(-0.2f, -0.6f, bodyRotation.x));
+            sLeaser.sprites[EyeSprites + 1].SetPosition(headPos + new Vector2(-3.5f, -1f) - camPos + lookDirection);
+            sLeaser.sprites[EyeSprites + 1].x -= bodyRotation.x * 2f - Mathf.Clamp01(-bodyRotation.x);
             sLeaser.sprites[EyeSprites + 1].y -= Mathf.Clamp01(-bodyRotation.y);
-            sLeaser.sprites[EyeSprites + 1].scaleX = Mathf.Lerp(0.27f, 0f, Mathf.InverseLerp(0.2f, 0.6f, bodyRotation.x));
+            sLeaser.sprites[EyeSprites + 1].scaleX = Mathf.Lerp(0.19f, 0f, Mathf.InverseLerp(0.2f, 0.6f, bodyRotation.x));
 
             Vector2 jetLowerPosition = Vector2.Lerp(lastAbdomenPositions[1], abdomenPositions[1], timeStacker);
 
             for (int i = 0; i < 4; i++)
             {
-                lastJetPositions[i] = jetPositions[i];
-                lastJetRotations[i] = jetRotations[i];
+                jetData[i].lastPos = jetData[i].pos;
+                jetData[i].lastRotation = jetData[i].rotation;
             }
 
-            jetPositions[0] = bodyPos + new Vector2(6f, 11f);
-            jetScales[0] = new Vector2(0.6f, 0.4f);
-            jetRotations[0] = 20f;
+            jetData[0].pos = bodyPos + new Vector2(6f, 11f);
+            jetData[0].scale = new Vector2(0.6f, 0.4f);
+            jetData[0].rotation = 20f;
 
-            jetPositions[1] = bodyPos + new Vector2(-6f, 11f);
-            jetScales[1] = new Vector2(0.6f, 0.4f);
-            jetRotations[1] = -20f;
+            jetData[1].pos = bodyPos + new Vector2(-6f, 11f);
+            jetData[1].scale = new Vector2(0.6f, 0.4f);
+            jetData[1].rotation = -20f;
 
-            jetPositions[2] = jetLowerPosition + new Vector2(11f, -5f);
-            jetScales[2] = new Vector2(0.8f, 0.6f);
-            jetRotations[2] = 44f;
+            jetData[2].pos = jetLowerPosition + new Vector2(11f, -5f);
+            jetData[2].scale = new Vector2(0.8f, 0.6f);
+            jetData[2].rotation = 44f;
 
-            jetPositions[3] = jetLowerPosition + new Vector2(-11f, -5f);
-            jetScales[3] = new Vector2(0.8f, 0.6f);
-            jetRotations[3] = -44f;
+            jetData[3].pos = jetLowerPosition + new Vector2(-11f, -5f);
+            jetData[3].scale = new Vector2(0.8f, 0.6f);
+            jetData[3].rotation = -44f;
 
             // X Rotation of Upper Jets
             //  Right Upper Jets
-            jetPositions[0].x += Mathf.Sin(bodyRotation.x * Mathf.PI / 2f) * 5f;
-            jetPositions[0].y -= Mathf.Lerp(0f, 3f, Mathf.InverseLerp(0f, 1f, Mathf.Abs(bodyRotation.x)));
-            jetRotations[0] = Mathf.Lerp(20f, 85f, Mathf.InverseLerp(0f, 1f, bodyRotation.x));
+            jetData[0].pos.x += Mathf.Sin(bodyRotation.x * Mathf.PI / 2f) * 5f;
+            jetData[0].pos.y -= Mathf.Lerp(0f, 3f, Mathf.InverseLerp(0f, 1f, Mathf.Abs(bodyRotation.x)));
+            jetData[0].rotation = Mathf.Lerp(20f, 85f, Mathf.InverseLerp(0f, 1f, bodyRotation.x));
 
             //  Left Upper Jets
-            jetPositions[1].x += Mathf.Sin(bodyRotation.x * Mathf.PI / 2f) * 5f;
-            jetPositions[1].y -= Mathf.Lerp(0f, 3f, Mathf.InverseLerp(0f, 1f, Mathf.Abs(bodyRotation.x)));
-            jetRotations[1] = Mathf.Lerp(-20f, -85f, Mathf.InverseLerp(0f, -1f, bodyRotation.x));
+            jetData[1].pos.x += Mathf.Sin(bodyRotation.x * Mathf.PI / 2f) * 5f;
+            jetData[1].pos.y -= Mathf.Lerp(0f, 3f, Mathf.InverseLerp(0f, 1f, Mathf.Abs(bodyRotation.x)));
+            jetData[1].rotation = Mathf.Lerp(-20f, -85f, Mathf.InverseLerp(0f, -1f, bodyRotation.x));
 
             // X Rotation of Lower Jets
             //  Right Lower Jets
-            jetPositions[2].x += Mathf.Sin(Mathf.Clamp01(bodyRotation.x) * Mathf.PI) * 4f;
-            jetPositions[2].y += Mathf.Sin(Mathf.Abs(bodyRotation.x) * Mathf.PI - Mathf.PI / 2f - Mathf.Cos(Mathf.Abs(bodyRotation.x) * Mathf.PI - Mathf.PI / 2f + Mathf.PI)) * 3f + 3f;
-            jetScales[2].x = Mathf.Lerp(0.8f, 0.9f, Mathf.InverseLerp(0f, 0.5f, Mathf.Pow(Mathf.Clamp01(bodyRotation.x) - (Mathf.Clamp(-bodyRotation.y, 0.5f, 1f) - 0.5f) * 2f, 2f)));
-            jetScales[2].y = Mathf.Lerp(0.6f, 0.7f, Mathf.InverseLerp(0f, 0.7f, Mathf.Pow(Mathf.Clamp01(bodyRotation.x) - (Mathf.Clamp(-bodyRotation.y, 0.5f, 1f) - 0.5f) * 2f, 2f)));
-            jetScales[2].y -= Mathf.Pow(Mathf.Sin((Mathf.Clamp01(bodyRotation.x) - (Mathf.Clamp(-bodyRotation.y, 0.2f, 1f) - 0.2f) * 1.25f) * Mathf.PI) / 2f, 3f);
-            jetRotations[2] = Mathf.Lerp(-Custom.AimFromOneVectorToAnother(lowerBodyPos, jetPositions[2]) / 2f + 15f, 44f, Mathf.InverseLerp(0.4f, 0f, Mathf.Pow(Mathf.Clamp01(bodyRotation.x) - (Mathf.Clamp(-bodyRotation.y, 0.5f, 1f) - 0.5f) * 2f, 2f)));
-            jetRotations[2] -= Mathf.Sin((Mathf.Clamp01(bodyRotation.x) - (Mathf.Clamp(-bodyRotation.y, 0.5f, 1f) - 0.5f) * 2f) * Mathf.PI) * 4f;
+            jetData[2].pos.x += Mathf.Sin(Mathf.Clamp01(bodyRotation.x) * Mathf.PI) * 4f;
+            jetData[2].pos.y += Mathf.Sin(Mathf.Abs(bodyRotation.x) * Mathf.PI - Mathf.PI / 2f - Mathf.Cos(Mathf.Abs(bodyRotation.x) * Mathf.PI - Mathf.PI / 2f + Mathf.PI)) * 3f + 3f;
+            jetData[2].scale.x = Mathf.Lerp(0.8f, 0.9f, Mathf.InverseLerp(0f, 0.5f, Mathf.Pow(Mathf.Clamp01(bodyRotation.x) - (Mathf.Clamp(-bodyRotation.y, 0.5f, 1f) - 0.5f) * 2f, 2f)));
+            jetData[2].scale.y = Mathf.Lerp(0.6f, 0.7f, Mathf.InverseLerp(0f, 0.7f, Mathf.Pow(Mathf.Clamp01(bodyRotation.x) - (Mathf.Clamp(-bodyRotation.y, 0.5f, 1f) - 0.5f) * 2f, 2f)));
+            jetData[2].scale.y -= Mathf.Pow(Mathf.Sin((Mathf.Clamp01(bodyRotation.x) - (Mathf.Clamp(-bodyRotation.y, 0.2f, 1f) - 0.2f) * 1.25f) * Mathf.PI) / 2f, 3f);
+            jetData[2].rotation = Mathf.Lerp(-Custom.AimFromOneVectorToAnother(lowerBodyPos, jetData[2].pos) / 2f + 15f, 44f, Mathf.InverseLerp(0.4f, 0f, Mathf.Pow(Mathf.Clamp01(bodyRotation.x) - (Mathf.Clamp(-bodyRotation.y, 0.5f, 1f) - 0.5f) * 2f, 2f)));
+            jetData[2].rotation -= Mathf.Sin((Mathf.Clamp01(bodyRotation.x) - (Mathf.Clamp(-bodyRotation.y, 0.5f, 1f) - 0.5f) * 2f) * Mathf.PI) * 4f;
 
             //  Left Lower Jets
-            jetPositions[3].x += Mathf.Sin(-Mathf.Clamp01(-bodyRotation.x) * Mathf.PI) * 4f;
-            jetPositions[3].y += Mathf.Sin(Mathf.Abs(bodyRotation.x) * Mathf.PI - Mathf.PI / 2f - Mathf.Cos(Mathf.Abs(bodyRotation.x) * Mathf.PI - Mathf.PI / 2f + Mathf.PI)) * 3f + 3f;
-            jetScales[3].x = Mathf.Lerp(0.8f, 0.9f, Mathf.InverseLerp(0f, -0.5f, -Mathf.Pow(Mathf.Clamp01(-bodyRotation.x) - (Mathf.Clamp(-bodyRotation.y, 0.5f, 1f) - 0.5f) * 2f, 2f)));
-            jetScales[3].y = Mathf.Lerp(0.6f, 0.7f, Mathf.InverseLerp(0f, -0.7f, -Mathf.Pow(Mathf.Clamp01(-bodyRotation.x) - (Mathf.Clamp(-bodyRotation.y, 0.5f, 1f) - 0.5f) * 2f, 2f)));
-            jetScales[3].y -= Mathf.Pow(Mathf.Sin((Mathf.Clamp01(-bodyRotation.x) - (Mathf.Clamp(-bodyRotation.y, 0.2f, 1f) - 0.2f) * 1.25f) * Mathf.PI) / 2f, 3f);
-            jetRotations[3] = Mathf.Lerp(-Custom.AimFromOneVectorToAnother(lowerBodyPos, jetPositions[3]) / 2f - 15f, -44f, Mathf.InverseLerp(-0.4f, 0f, -Mathf.Pow(Mathf.Clamp01(-bodyRotation.x) - (Mathf.Clamp(-bodyRotation.y, 0.5f, 1f) - 0.5f) * 2f, 2f)));
-            jetRotations[3] += Mathf.Sin((Mathf.Clamp01(-bodyRotation.x) - (Mathf.Clamp(-bodyRotation.y, 0.5f, 1f) - 0.5f) * 2f) * Mathf.PI) * 4f;
+            jetData[3].pos.x += Mathf.Sin(-Mathf.Clamp01(-bodyRotation.x) * Mathf.PI) * 4f;
+            jetData[3].pos.y += Mathf.Sin(Mathf.Abs(bodyRotation.x) * Mathf.PI - Mathf.PI / 2f - Mathf.Cos(Mathf.Abs(bodyRotation.x) * Mathf.PI - Mathf.PI / 2f + Mathf.PI)) * 3f + 3f;
+            jetData[3].scale.x = Mathf.Lerp(0.8f, 0.9f, Mathf.InverseLerp(0f, -0.5f, -Mathf.Pow(Mathf.Clamp01(-bodyRotation.x) - (Mathf.Clamp(-bodyRotation.y, 0.5f, 1f) - 0.5f) * 2f, 2f)));
+            jetData[3].scale.y = Mathf.Lerp(0.6f, 0.7f, Mathf.InverseLerp(0f, -0.7f, -Mathf.Pow(Mathf.Clamp01(-bodyRotation.x) - (Mathf.Clamp(-bodyRotation.y, 0.5f, 1f) - 0.5f) * 2f, 2f)));
+            jetData[3].scale.y -= Mathf.Pow(Mathf.Sin((Mathf.Clamp01(-bodyRotation.x) - (Mathf.Clamp(-bodyRotation.y, 0.2f, 1f) - 0.2f) * 1.25f) * Mathf.PI) / 2f, 3f);
+            jetData[3].rotation = Mathf.Lerp(-Custom.AimFromOneVectorToAnother(lowerBodyPos, jetData[3].pos) / 2f - 15f, -44f, Mathf.InverseLerp(-0.4f, 0f, -Mathf.Pow(Mathf.Clamp01(-bodyRotation.x) - (Mathf.Clamp(-bodyRotation.y, 0.5f, 1f) - 0.5f) * 2f, 2f)));
+            jetData[3].rotation += Mathf.Sin((Mathf.Clamp01(-bodyRotation.x) - (Mathf.Clamp(-bodyRotation.y, 0.5f, 1f) - 0.5f) * 2f) * Mathf.PI) * 4f;
 
             if (bodyRotation.x < -0.1f && bodyRotation.y > 0f)
             {
-                jetPositions[2].x -= Mathf.Lerp(0f, 15f, Mathf.Lerp(0.1f, 0.5f, Mathf.Clamp01(-bodyRotation.x)));
-                jetRotations[2] += Mathf.Lerp(0f, 140f, Mathf.InverseLerp(0.1f, 0.7f, Mathf.Pow(Mathf.Clamp01(-bodyRotation.x) - (Mathf.Clamp(-bodyRotation.y, 0f, 0.5f)), 2f) * 2f));
+                jetData[2].pos.x -= Mathf.Lerp(0f, 15f, Mathf.Lerp(0.1f, 0.5f, Mathf.Clamp01(-bodyRotation.x)));
+                jetData[2].rotation += Mathf.Lerp(0f, 140f, Mathf.InverseLerp(0.1f, 0.7f, Mathf.Pow(Mathf.Clamp01(-bodyRotation.x) - (Mathf.Clamp(-bodyRotation.y, 0f, 0.5f)), 2f) * 2f));
             }
             else if (bodyRotation.x > 0.1f && bodyRotation.y > 0f)
             {
-                jetPositions[3].x += Mathf.Lerp(0f, 15f, Mathf.Lerp(0.1f, 0.5f, Mathf.Clamp01(bodyRotation.x)));
-                jetRotations[3] -= Mathf.Lerp(0f, 140f, Mathf.InverseLerp(0.1f, 0.7f, Mathf.Pow(Mathf.Clamp01(bodyRotation.x) - (Mathf.Clamp(-bodyRotation.y, 0f, 0.5f)) * 2f, 2f)));
+                jetData[3].pos.x += Mathf.Lerp(0f, 15f, Mathf.Lerp(0.1f, 0.5f, Mathf.Clamp01(bodyRotation.x)));
+                jetData[3].rotation -= Mathf.Lerp(0f, 140f, Mathf.InverseLerp(0.1f, 0.7f, Mathf.Pow(Mathf.Clamp01(bodyRotation.x) - (Mathf.Clamp(-bodyRotation.y, 0f, 0.5f)) * 2f, 2f)));
             }
 
             // Y Rotation of Lower Jets
             //  Right Lower Jets
-            jetPositions[2].x -= Mathf.Lerp(0f, 4f, Mathf.InverseLerp(0f, -1f, bodyRotation.y));
-            jetPositions[2].x -= Mathf.Sin(Mathf.Clamp01(-bodyRotation.y)* Mathf.PI) * 2f;
-            jetPositions[2].y += Mathf.Lerp(0f, 14f, Mathf.InverseLerp(0.2f, -0.8f, bodyRotation.y));
-            jetScales[2].x -= Mathf.Pow(Mathf.Sin((Mathf.Clamp(bodyRotation.y, -0.8f, -0.4f) + 0.4f) * 2.5f * Mathf.PI), 2f) / 2.5f;
-            jetScales[2].y -= Mathf.Lerp(0f, 0.1f, Mathf.InverseLerp(0f, -1f, bodyRotation.y));
-            jetRotations[2] *= Mathf.Lerp(1f, 0f, Mathf.InverseLerp(0f, -0.5f, bodyRotation.y));
-            jetRotations[2] -= Mathf.Lerp(0f, 75f, Mathf.InverseLerp(-0.3f, -0.8f, bodyRotation.y));
+            jetData[2].pos.x -= Mathf.Lerp(0f, 4f, Mathf.InverseLerp(0f, -1f, bodyRotation.y));
+            jetData[2].pos.x -= Mathf.Sin(Mathf.Clamp01(-bodyRotation.y)* Mathf.PI) * 2f;
+            jetData[2].pos.y += Mathf.Lerp(0f, 14f, Mathf.InverseLerp(0.2f, -0.8f, bodyRotation.y));
+            jetData[2].scale.x -= Mathf.Pow(Mathf.Sin((Mathf.Clamp(bodyRotation.y, -0.8f, -0.4f) + 0.4f) * 2.5f * Mathf.PI), 2f) / 2.5f;
+            jetData[2].scale.y -= Mathf.Lerp(0f, 0.1f, Mathf.InverseLerp(0f, -1f, bodyRotation.y));
+            jetData[2].rotation *= Mathf.Lerp(1f, 0f, Mathf.InverseLerp(0f, -0.5f, bodyRotation.y));
+            jetData[2].rotation -= Mathf.Lerp(0f, 75f, Mathf.InverseLerp(-0.3f, -0.8f, bodyRotation.y));
 
             //  Left Lower Jets
-            jetPositions[3].x += Mathf.Lerp(0f, 4f, Mathf.InverseLerp(0f, -1f, bodyRotation.y));
-            jetPositions[3].x += Mathf.Sin(Mathf.Clamp01(-bodyRotation.y) * Mathf.PI) * 2f;
-            jetPositions[3].y += Mathf.Lerp(0f, 14f, Mathf.InverseLerp(0.2f, -0.8f, bodyRotation.y));
-            jetScales[3].x -= Mathf.Pow(Mathf.Sin((Mathf.Clamp(bodyRotation.y, -0.8f, -0.4f) + 0.4f) * 2.5f * Mathf.PI), 2f) / 2.5f;
-            jetScales[3].y -= Mathf.Lerp(0f, 0.1f, Mathf.InverseLerp(0f, -1f, bodyRotation.y));
-            jetRotations[3] *= Mathf.Lerp(1f, 0f, Mathf.InverseLerp(0f, -0.5f, bodyRotation.y));
-            jetRotations[3] += Mathf.Lerp(0f, 75f, Mathf.InverseLerp(-0.3f, -0.8f, bodyRotation.y));
+            jetData[3].pos.x += Mathf.Lerp(0f, 4f, Mathf.InverseLerp(0f, -1f, bodyRotation.y));
+            jetData[3].pos.x += Mathf.Sin(Mathf.Clamp01(-bodyRotation.y) * Mathf.PI) * 2f;
+            jetData[3].pos.y += Mathf.Lerp(0f, 14f, Mathf.InverseLerp(0.2f, -0.8f, bodyRotation.y));
+            jetData[3].scale.x -= Mathf.Pow(Mathf.Sin((Mathf.Clamp(bodyRotation.y, -0.8f, -0.4f) + 0.4f) * 2.5f * Mathf.PI), 2f) / 2.5f;
+            jetData[3].scale.y -= Mathf.Lerp(0f, 0.1f, Mathf.InverseLerp(0f, -1f, bodyRotation.y));
+            jetData[3].rotation *= Mathf.Lerp(1f, 0f, Mathf.InverseLerp(0f, -0.5f, bodyRotation.y));
+            jetData[3].rotation += Mathf.Lerp(0f, 75f, Mathf.InverseLerp(-0.3f, -0.8f, bodyRotation.y));
 
             for (int i = 0; i < 4; i++)
             {
-                sLeaser.sprites[JetSprites + i].SetPosition(Vector2.Lerp(lastJetPositions[i], jetPositions[i], timeStacker) - camPos);
-                sLeaser.sprites[JetSprites + i].scaleX = jetScales[i].x;
-                sLeaser.sprites[JetSprites + i].scaleY = jetScales[i].y;
-                sLeaser.sprites[JetSprites + i].rotation = Mathf.Lerp(lastJetRotations[i], jetRotations[i], timeStacker);
+                sLeaser.sprites[JetSprites + i].SetPosition(Vector2.Lerp(jetData[i].lastPos, jetData[i].pos, timeStacker) - camPos);
+                sLeaser.sprites[JetSprites + i].scaleX = jetData[i].scale.x;
+                sLeaser.sprites[JetSprites + i].scaleY = jetData[i].scale.y;
+                sLeaser.sprites[JetSprites + i].rotation = Mathf.Lerp(jetData[i].lastRotation, jetData[i].rotation, timeStacker);
             }
 
             // Sprite Layering
@@ -839,21 +844,21 @@ namespace BuzzCreature.Objects.Buzz
             sLeaser.containers[3].MoveBehindOtherNode(sLeaser.sprites[JetSprites + 3]);
 
             // Jet Flames
-            jetSmoke[0].MoveToInternalContainer(0);
-            jetSmoke[0].MoveTo(Vector2.Lerp(lastJetPositions[0], jetPositions[0], timeStacker) + Custom.DegToVec(jetRotations[0]), buzz.evenUpdate);
-            jetSmoke[0].EmitParticles(Custom.DegToVec(jetRotations[0]) * Mathf.Lerp(lastJetFlamePowers[0], jetFlamePowers[0], timeStacker) / 3f, Mathf.Lerp(lastJetFlamePowers[0], jetFlamePowers[0], timeStacker));
+            jetData[0].smoke.MoveToInternalContainer(0);
+            jetData[0].smoke.MoveTo(Vector2.Lerp(jetData[0].lastPos, jetData[0].pos, timeStacker) + Custom.DegToVec(jetData[0].rotation), buzz.evenUpdate);
+            jetData[0].smoke.EmitParticles(Custom.DegToVec(jetData[0].rotation) * Mathf.Lerp(jetData[0].lastFlamePower, jetData[0].flamePower, timeStacker) / 3f, Mathf.Lerp(jetData[0].lastFlamePower, jetData[0].flamePower, timeStacker));
 
-            jetSmoke[1].MoveToInternalContainer(1);
-            jetSmoke[1].MoveTo(Vector2.Lerp(lastJetPositions[1], jetPositions[1], timeStacker) + Custom.DegToVec(jetRotations[1]), buzz.evenUpdate);
-            jetSmoke[1].EmitParticles(Custom.DegToVec(jetRotations[1]) * Mathf.Lerp(lastJetFlamePowers[1], jetFlamePowers[1], timeStacker) / 3f, Mathf.Lerp(lastJetFlamePowers[1], jetFlamePowers[1], timeStacker));
+            jetData[1].smoke.MoveToInternalContainer(1);
+            jetData[1].smoke.MoveTo(Vector2.Lerp(jetData[1].lastPos, jetData[1].pos, timeStacker) + Custom.DegToVec(jetData[1].rotation), buzz.evenUpdate);
+            jetData[1].smoke.EmitParticles(Custom.DegToVec(jetData[1].rotation) * Mathf.Lerp(jetData[1].lastFlamePower, jetData[1].flamePower, timeStacker) / 3f, Mathf.Lerp(jetData[1].lastFlamePower, jetData[1].flamePower, timeStacker));
 
-            jetSmoke[2].MoveToInternalContainer(2);
-            jetSmoke[2].MoveTo(Vector2.Lerp(lastJetPositions[2], jetPositions[2], timeStacker) + -Custom.PerpendicularVector(Custom.DegToVec(jetRotations[2])), buzz.evenUpdate);
-            jetSmoke[2].EmitParticles(-Custom.PerpendicularVector(Custom.DegToVec(jetRotations[2])) * Mathf.Lerp(lastJetFlamePowers[2], jetFlamePowers[2], timeStacker) / 3f, Mathf.Lerp(lastJetFlamePowers[2], jetFlamePowers[2], timeStacker));
+            jetData[2].smoke.MoveToInternalContainer(2);
+            jetData[2].smoke.MoveTo(Vector2.Lerp(jetData[2].lastPos, jetData[2].pos, timeStacker) + -Custom.PerpendicularVector(Custom.DegToVec(jetData[2].rotation)), buzz.evenUpdate);
+            jetData[2].smoke.EmitParticles(-Custom.PerpendicularVector(Custom.DegToVec(jetData[2].rotation)) * Mathf.Lerp(jetData[2].lastFlamePower, jetData[2].flamePower, timeStacker) / 3f, Mathf.Lerp(jetData[2].lastFlamePower, jetData[2].flamePower, timeStacker));
 
-            jetSmoke[3].MoveToInternalContainer(3);
-            jetSmoke[3].EmitParticles(Custom.PerpendicularVector(Custom.DegToVec(jetRotations[3])) * Mathf.Lerp(lastJetFlamePowers[3], jetFlamePowers[3], timeStacker) / 3f, Mathf.Lerp(lastJetFlamePowers[3], jetFlamePowers[3], timeStacker));
-            jetSmoke[3].MoveTo(Vector2.Lerp(lastJetPositions[3], jetPositions[3], timeStacker) + Custom.PerpendicularVector(Custom.DegToVec(jetRotations[3])), buzz.evenUpdate);
+            jetData[3].smoke.MoveToInternalContainer(3);
+            jetData[3].smoke.EmitParticles(Custom.PerpendicularVector(Custom.DegToVec(jetData[3].rotation)) * Mathf.Lerp(jetData[3].lastFlamePower, jetData[3].flamePower, timeStacker) / 3f, Mathf.Lerp(jetData[3].lastFlamePower, jetData[3].flamePower, timeStacker));
+            jetData[3].smoke.MoveTo(Vector2.Lerp(jetData[3].lastPos, jetData[3].pos, timeStacker) + Custom.PerpendicularVector(Custom.DegToVec(jetData[3].rotation)), buzz.evenUpdate);
 
 
             for (int i = 0; i < 2; i++)
@@ -871,25 +876,27 @@ namespace BuzzCreature.Objects.Buzz
 
         public override void ApplyPalette(RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam, RoomPalette palette)
         {
-            baseColor = new HSLColor(0.06f, 0.9f, 0.5f).rgb;
-            lightColor = new HSLColor(0.1f, 0.9f, 0.6f).rgb;
-            Color jetColor = new HSLColor(0.03f, 1f, 0.22f).rgb;
-            Color blackColor = palette.blackColor;
+            bodyColor = new Color(0.25f, 0.4f, 0.6f);
+            lightColor = new Color(0f, 0.75f, 0.7f);
+            darkColor = new Color(0.05f, 0f, 0.1f);
+            Color blackColor = Color.Lerp(palette.blackColor, darkColor, 0.5f);
+
             for (int i = 0; i < buttSprites; i++)
             {
-                Color abdomenColor = Color.Lerp(baseColor, Color.Lerp(blackColor, Color.Lerp(baseColor, lightColor, 0.8f), i > 2 ? i % 4 == 1 ? 1f : 0f : 0f), Mathf.Abs(Mathf.Sin(Mathf.Pow(Mathf.Sin((float)i / (float)4 * Mathf.PI), 2f))) * 0.8f);
-                abdomenColor = Color.Lerp(abdomenColor, lightColor, Mathf.InverseLerp(16f, 0f, (float)i) * 0.3f);
+                Color abdomenColor = blackColor;
+                if (i % 4 == 0) abdomenColor = lightColor;
+                //if (i % 4 == 1) abdomenColor = lightColor;
                 sLeaser.sprites[i].color = abdomenColor;
             }
-            sLeaser.sprites[BodySprite].color = Color.Lerp(blackColor, Color.Lerp(baseColor, lightColor, 0.5f), 0.3f);
-            sLeaser.sprites[HeadSprite].color = Color.Lerp(blackColor, baseColor, 0.1f);
+            sLeaser.sprites[BodySprite].color = Color.Lerp(bodyColor, blackColor, 0.6f);
+            sLeaser.sprites[HeadSprite].color = blackColor;
             sLeaser.sprites[EyeSprites].color = Color.white;
             sLeaser.sprites[EyeSprites + 1].color = Color.white;
 
-            sLeaser.sprites[JetSprites].color = Color.Lerp(jetColor, lightColor, 0.15f);
-            sLeaser.sprites[JetSprites + 1].color = Color.Lerp(jetColor, lightColor, 0.15f);
-            sLeaser.sprites[JetSprites + 2].color = Color.Lerp(jetColor, lightColor, 0.1f);
-            sLeaser.sprites[JetSprites + 3].color = Color.Lerp(jetColor, lightColor, 0.1f);
+            sLeaser.sprites[JetSprites].color = Color.Lerp(bodyColor, blackColor, 0.8f);
+            sLeaser.sprites[JetSprites + 1].color = Color.Lerp(bodyColor, blackColor, 0.8f);
+            sLeaser.sprites[JetSprites + 2].color = Color.Lerp(bodyColor, blackColor, 0.8f);
+            sLeaser.sprites[JetSprites + 3].color = Color.Lerp(bodyColor, blackColor, 0.8f);
 
             for (int i = 0; i < 2; i++)
             {
@@ -950,15 +957,15 @@ namespace BuzzCreature.Objects.Buzz
                 {
                     for (int i = 0; i < 4; i++)
                     {
-                        jetFlamePowers[i] = Mathf.Lerp(jetFlamePowers[i], 0f, 0.8f);
+                        jetData[i].flamePower = Mathf.Lerp(jetData[i].flamePower, 0f, 0.8f);
                     }
                     downBoost += 0.05f;
                     downBoost = Mathf.Clamp(downBoost, 1f, 2f);
                 }
                 else if (buzz.thrustVel.y > 2f && buzz.mainBodyChunk.vel.y > -1f)
                 {
-                    jetFlamePowers[0] = Mathf.Lerp(jetFlamePowers[0], 0f, 0.75f);
-                    jetFlamePowers[1] = Mathf.Lerp(jetFlamePowers[1], 0f, 0.75f);
+                    jetData[0].flamePower = Mathf.Lerp(jetData[0].flamePower, 0f, 0.75f);
+                    jetData[1].flamePower = Mathf.Lerp(jetData[1].flamePower, 0f, 0.75f);
                     upBoost += 0.05f;
                     upBoost = Mathf.Clamp(upBoost, 1f, 1.4f);
                 }
@@ -966,7 +973,7 @@ namespace BuzzCreature.Objects.Buzz
                 {
                     for (int i = 0; i < 4; i++)
                     {
-                        jetFlamePowers[i] = Mathf.Lerp(jetFlamePowers[i], 3f, 0.2f);
+                        jetData[i].flamePower = Mathf.Lerp(jetData[i].flamePower, 3f, 0.2f);
                     }
                     if (buzz.thrustVel.x > 0f)
                     {
@@ -981,10 +988,10 @@ namespace BuzzCreature.Objects.Buzz
                 }
                 else
                 {
-                    jetFlamePowers[0] = 1f * upBoost * leftBoost * buzz.jetPower;
-                    jetFlamePowers[1] = 1f * upBoost * rightBoost * buzz.jetPower;
-                    jetFlamePowers[2] = 4.5f * downBoost * leftBoost * buzz.jetPower;
-                    jetFlamePowers[3] = 4.5f * downBoost * rightBoost * buzz.jetPower;
+                    jetData[0].flamePower = 1f * upBoost * leftBoost * buzz.jetPower;
+                    jetData[1].flamePower = 1f * upBoost * rightBoost * buzz.jetPower;
+                    jetData[2].flamePower = 4.5f * downBoost * leftBoost * buzz.jetPower;
+                    jetData[3].flamePower = 4.5f * downBoost * rightBoost * buzz.jetPower;
 
                     downBoost = Mathf.Lerp(downBoost, 1f, 0.05f);
                     upBoost = Mathf.Lerp(upBoost, 1f, 0.05f);
@@ -996,13 +1003,13 @@ namespace BuzzCreature.Objects.Buzz
             {
                 for (int i = 0; i < 4; i++)
                 {
-                    jetFlamePowers[i] = Mathf.Lerp(jetFlamePowers[i], 0f, 0.9f);
+                    jetData[i].flamePower = Mathf.Lerp(jetData[i].flamePower, 0f, 0.9f);
                 }
             }
 
             for (int i = 0; i < 4; i++)
             {
-                lastJetFlamePowers[i] = jetFlamePowers[i];
+                jetData[i].lastFlamePower = jetData[i].flamePower;
             }
 
                 for (int i = 0; i < 2; i++)
