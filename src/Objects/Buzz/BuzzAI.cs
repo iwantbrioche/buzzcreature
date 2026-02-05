@@ -4,7 +4,7 @@ using System.Drawing;
 
 namespace BuzzCreature.Objects.Buzz
 {
-    public class BuzzAI : ArtificialIntelligence, IUseARelationshipTracker, IUseItemTracker, IReactToSocialEvents, FriendTracker.IHaveFriendTracker, ILookingAtCreatures
+    public class BuzzAI : ArtificialIntelligence, IUseARelationshipTracker, IUseItemTracker, IReactToSocialEvents, ILookingAtCreatures
     {
         public class Behavior(string value, bool register = false) : ExtEnum<Behavior>(value, register)
         {
@@ -18,16 +18,11 @@ namespace BuzzCreature.Objects.Buzz
         public Tracker.CreatureRepresentation focusCreature;
         public CreatureLooker creatureLooker; // 👀
 
-        public WorldCoordinate idlePos;
-        public WorldCoordinate lastIdlePos;
-        public int idleCounter;
-        public int addOldIdlePosDelay;
-        public List<WorldCoordinate> oldIdlePositions;
-
         public float currentUtility;
 
         private DebugDestinationVisualizer debugDestinationVisualizer;
         private DebugTrackerVisualizer debugTrackerVisualizer;
+        public FollowPathVisualizer followPathVisualizer;
         public BuzzAI(AbstractCreature abstractCreature, World world) : base(abstractCreature, world)
         {
             buzz = abstractCreature.realizedCreature as Buzz;
@@ -48,13 +43,12 @@ namespace BuzzCreature.Objects.Buzz
             utilityComparer.AddComparedModule(stuckTracker, null, 1f, 1.1f);
             creatureLooker = new(this, tracker, buzz, 0.8f, 20);
             behavior = Behavior.Idle;
-            oldIdlePositions = [];
+
 
             //debugDestinationVisualizer = new(world.game.abstractSpaceVisualizer, world, pathFinder, Color.red);
             //debugTrackerVisualizer = new(tracker);
             //itemTracker.visualize = true;
             //pathFinder.visualize = true;
-            pathFinder.visualizePath = true;
         }
 
         public override void Update()
@@ -62,12 +56,13 @@ namespace BuzzCreature.Objects.Buzz
             debugDestinationVisualizer?.Update();
             debugTrackerVisualizer?.Update();
 
+            
+
             if (buzz.room.game.devToolsActive && Input.GetMouseButton(2))
             {
-                creature.abstractAI.SetDestination(buzz.room.GetWorldCoordinate((Vector2)Futile.mousePosition + buzz.room.game.cameras[0].pos));
+                IntVector2 tilePosition = buzz.room.game.world.activeRooms[0].GetTilePosition((Vector2)Futile.mousePosition + buzz.room.game.cameras[0].pos);
+                creature.abstractAI.SetDestination(new WorldCoordinate(buzz.room.game.cameras[0].room.abstractRoom.index, tilePosition.x, tilePosition.y, -1));
             }
-
-            if (addOldIdlePosDelay > 0) addOldIdlePosDelay--;
 
             creatureLooker.Update();
 
@@ -75,28 +70,25 @@ namespace BuzzCreature.Objects.Buzz
             currentUtility = utilityComparer.HighestUtility();
 
 
-            //if (aiModule != null)
-            //{
-            //    if (aiModule is ThreatTracker)
-            //    {
-            //        behavior = Behavior.Flee;
-            //    }
-            //}
-            //if (currentUtility < 0.1f)
-            //{
-            //    behavior = Behavior.Idle;
-            //}
+            if (aiModule != null)
+            {
+                if (aiModule is ThreatTracker)
+                {
+                    behavior = Behavior.Flee;
+                }
+            }
+            if (currentUtility < 0.1f)
+            {
+                behavior = Behavior.Idle;
+            }
 
             if (behavior == Behavior.Idle)
             {
-                //if (itemTracker.ItemCount > 0)
-                //{
-                //    behavior = Behavior.SearchForItems;
-                //}
+
             }
             else if (behavior == Behavior.Flee)
             {
-                WorldCoordinate destination = threatTracker.FleeTo(creature.pos, 1, 30, currentUtility > 0.3f);
+                WorldCoordinate destination = threatTracker.FleeTo(creature.pos, 1, 30, false);
                 if (threatTracker.mostThreateningCreature != null)
                 {
                     focusCreature = threatTracker.mostThreateningCreature;
@@ -105,72 +97,37 @@ namespace BuzzCreature.Objects.Buzz
             }
             else if (behavior == Behavior.SearchForItems)
             {
-                if (itemTracker.ItemCount > 0)
-                {
-                    //DebugDrawing.DrawLine(buzz.room, buzz.firstChunk.pos, buzz.room.MiddleOfTile(itemTracker.items[0].BestGuessForPosition()), Color.red);
-                    //creature.abstractAI.SetDestination(itemTracker.items[0].BestGuessForPosition());
-                }
-                else
-                {
-                    behavior = Behavior.Idle;
-                }
             }
 
-            DebugDrawing.DrawText(buzz.room, behavior.value, buzz.firstChunk.pos + new Vector2(15f, 30f), Color.white);
+            //DebugDrawing.DrawText(buzz.room, behavior.value, buzz.firstChunk.pos + new Vector2(15f, 30f), Color.white);
 
             base.Update();
         }
 
-        public void IdleBehavior()
+        public override PathCost TravelPreference(MovementConnection coord, PathCost cost)
         {
-            // taken from squidcadas
-            Vector2 pos = Random.value < 0.5f ? buzz.room.MiddleOfTile(idlePos) + Custom.RNV() * Random.value * 400f : buzz.mainBodyChunk.pos + Custom.RNV() * Random.value * 400f;
-            if (IdleScore(buzz.room.GetWorldCoordinate(pos)) < IdleScore(idlePos))
+            if (buzz.flying)
             {
-                idlePos = buzz.room.GetWorldCoordinate(pos);
-            }
-            if (IdleScore(idlePos) + idleCounter * 2f < IdleScore(pathFinder.GetDestination))
-            {
-                if (addOldIdlePosDelay < 1 && timeInRoom > 120)
+
+                cost = new PathCost(cost.resistance + (buzz.room.aimap.getTerrainProximity(coord.destinationCoord) > 3 ? 0f : Custom.LerpMap(buzz.room.aimap.getTerrainProximity(coord.destinationCoord), 0f, 3f, 600f, 0f)), cost.legality);
+                if (coord.type == MovementConnection.MovementType.ShortCut || buzz.room.aimap.getAItile(coord.destinationCoord).narrowSpace)
                 {
-                    addOldIdlePosDelay = 90;
-                    oldIdlePositions.Add(lastIdlePos);
-                    if (oldIdlePositions.Count > 5)
+                    cost = new PathCost(cost.resistance, cost.legality);
+                }
+            }
+            else
+            {
+                cost = new PathCost(cost.resistance, cost.legality);
+                if (buzz.room.aimap.getAItile(coord.destinationCoord).acc != AItile.Accessibility.Corridor && buzz.room.aimap.getAItile(coord.destinationCoord).acc != AItile.Accessibility.Climb)
+                {
+                    if (buzz.room.aimap.getAItile(coord.destinationCoord).smoothedFloorAltitude > 1)
                     {
-                        oldIdlePositions.RemoveAt(0);
+                        cost.legality = PathCost.Legality.Unallowed;
                     }
-                    idleCounter = Random.Range(50, 200);
-                }
-                creature.abstractAI.SetDestination(idlePos);
-                lastIdlePos = idlePos;
-            }
-            idleCounter--;
-
-        }
-
-        public float IdleScore(WorldCoordinate coord)
-        {
-            if (!pathFinder.CoordinatePossibleToGetBackFrom(coord))
-            {
-                return float.MaxValue;
-            }
-            float score = 0f;
-            for (int i = 0; i < oldIdlePositions.Count; i++)
-            {
-                if (oldIdlePositions[i].room == coord.room)
-                {
-                    score -= Mathf.Pow(Mathf.Min(30f, oldIdlePositions[i].Tile.FloatDist(coord.Tile)), 2f) / (30f * (1f + i * 0.2f));
                 }
             }
-            for (int j = 0; j < tracker.CreaturesCount; j++)
-            {
-                if (Custom.DistLess(coord, tracker.GetRep(j).BestGuessForPosition(), 25f) && tracker.GetRep(j).dynamicRelationship.currentRelationship.type != CreatureTemplate.Relationship.Type.Ignores && tracker.GetRep(j).dynamicRelationship.state.alive)
-                {
-                    score += Custom.LerpMap(coord.Tile.FloatDist(tracker.GetRep(j).BestGuessForPosition().Tile), 1f, 25f, 30f * tracker.GetRep(j).representedCreature.creatureTemplate.bodySize, 0f, 0.5f);
-                }
-            }
-            score -= Mathf.Pow(Mathf.Min(buzz.room.aimap.getTerrainProximity(coord.Tile), 5), 2f) * 2f;
-            return score;
+            //DebugDrawing.DrawCross(buzz.room, buzz.room.MiddleOfTile(coord.destinationCoord), Color.Lerp(Color.white, Color.red, Mathf.InverseLerp(cost.resistance, 0f, 200f)), 15f, 1.25f);
+            return cost;
         }
 
         public AIModule ModuleToTrackRelationship(CreatureTemplate.Relationship relationship)

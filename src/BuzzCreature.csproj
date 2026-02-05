@@ -16,6 +16,10 @@
 		<OutputPath>..\mod\plugins</OutputPath>
 		<DebugType>portable</DebugType>
 	</PropertyGroup>
+	<PropertyGroup Condition="'$(Configuration)' == 'Release'">
+		<OutputPath>..\mod\plugins</OutputPath>
+		<DebugType>none</DebugType>
+	</PropertyGroup>
 
 	<ItemGroup>
 		<Reference Include="..\lib\*.dll">

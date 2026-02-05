@@ -22,12 +22,10 @@ namespace BuzzCreature.Objects.Buzz
             List<TileConnectionResistance> connectionResistances = [];
 
             typeResistances.Add(new TileTypeResistance(AItile.Accessibility.Air, 1f, PathCost.Legality.Allowed));
-            //typeResistances.Add(new TileTypeResistance(AItile.Accessibility.Floor, 1f, PathCost.Legality.Allowed));
-            //typeResistances.Add(new TileTypeResistance(AItile.Accessibility.Climb, 1f, PathCost.Legality.Allowed));
             connectionResistances.Add(new TileConnectionResistance(MovementConnection.MovementType.Standard, 1f, PathCost.Legality.Allowed));
             connectionResistances.Add(new TileConnectionResistance(MovementConnection.MovementType.OpenDiagonal, 1f, PathCost.Legality.Allowed));
             connectionResistances.Add(new TileConnectionResistance(MovementConnection.MovementType.ShortCut, 1f, PathCost.Legality.Allowed));
-            connectionResistances.Add(new TileConnectionResistance(MovementConnection.MovementType.NPCTransportation, 10f, PathCost.Legality.Allowed));
+            //connectionResistances.Add(new TileConnectionResistance(MovementConnection.MovementType.NPCTransportation, 10f, PathCost.Legality.Allowed));
             connectionResistances.Add(new TileConnectionResistance(MovementConnection.MovementType.OffScreenMovement, 1f, PathCost.Legality.Allowed));
             connectionResistances.Add(new TileConnectionResistance(MovementConnection.MovementType.BetweenRooms, 1f, PathCost.Legality.Allowed));
 
@@ -45,18 +43,18 @@ namespace BuzzCreature.Objects.Buzz
                 offScreenSpeed = 1.5f,
                 bodySize = 0.25f,
                 grasps = 1,
-                preBakedPathingAncestor = StaticWorld.GetCreatureTemplate(CreatureTemplate.Type.Fly),
+                preBakedPathingAncestor = StaticWorld.GetCreatureTemplate(CreatureTemplate.Type.CicadaA),
                 stowFoodInDen = false,
                 visualRadius = 700f,
                 movementBasedVision = 0.3f,
                 communityInfluence = 0.5f,
                 socialMemory = true,
-                shortcutSegments = 1,
+                shortcutSegments = 2,
                 shortcutColor = new(1f, 1f, 1f),
-                dangerousToPlayer = 0.3f,
+                dangerousToPlayer = 0.2f,
                 waterRelationship = CreatureTemplate.WaterRelationship.AirOnly,
                 meatPoints = 1,
-                usesNPCTransportation = true
+                usesNPCTransportation = false
             };
 
             return buzzTemplate;
@@ -68,20 +66,29 @@ namespace BuzzCreature.Objects.Buzz
 
             relationships.IsInPack(BuzzEnums.Buzz, 1f);
 
-            relationships.Fears(CreatureTemplate.Type.Vulture, 1f);
-
             relationships.EatenBy(CreatureTemplate.Type.Vulture, 1f);
 
-        }
+            relationships.Fears(CreatureTemplate.Type.Vulture, 1f);
 
-        public override ArtificialIntelligence CreateRealizedAI(AbstractCreature acrit)
-        {
-            return new BuzzAI(acrit, acrit.world);
+            relationships.MakesUncomfortable(CreatureTemplate.Type.Scavenger, 0.8f);
+
+            relationships.AntagonizedBy(CreatureTemplate.Type.CicadaA, 1f);
+            relationships.AntagonizedBy(CreatureTemplate.Type.CicadaB, 1f);
+
         }
 
         public override Creature CreateRealizedCreature(AbstractCreature acrit)
         {
             return new Buzz(acrit, acrit.world);
         }
+        public override ArtificialIntelligence CreateRealizedAI(AbstractCreature acrit)
+        {
+            return new BuzzAI(acrit, acrit.world);
+        }
+        public override AbstractCreatureAI CreateAbstractAI(AbstractCreature acrit)
+        {
+            return new BuzzAbstractAI(acrit.world, acrit);
+        }
+
     }
 }

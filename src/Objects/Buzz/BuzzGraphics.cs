@@ -10,7 +10,7 @@ namespace BuzzCreature.Objects.Buzz
      * old colors
      * longer antennae
      * floppier antennae
-     */ 
+     */
     public class BuzzGraphics : GraphicsModule
     {
         private class BuzzAntennae
@@ -171,7 +171,7 @@ namespace BuzzCreature.Objects.Buzz
             {
                 base.Update();
 
-                if (buzz.movementMode == Buzz.MovementMode.Flying)
+                if (buzz.flying)
                 {
                     mode = Mode.HuntAbsolutePosition;
                     absoluteHuntPos = new Vector2(buzz.bodyChunks[1].pos.x, Mathf.Lerp(buzz.bodyChunks[0].pos.y - 30f, buzz.bodyChunks[1].pos.y, Mathf.Pow(Mathf.InverseLerp(0.4f, 1f, Mathf.Abs(buzz.bodyRotation.x)), 0.8f)));
@@ -412,112 +412,21 @@ namespace BuzzCreature.Objects.Buzz
                 }
             }
         }
-        private class BuzzJets : PositionedSmokeEmitter
-        {
-            private BuzzGraphics graphics;
-            public class BuzzSmokeSegment : MeshSmoke.HyrbidSmokeSegment
-            {
-                public int age;
-                public float power;
-
-                public override void Reset(SmokeSystem newOwner, Vector2 pos, Vector2 vel, float lifeTime)
-                {
-                    base.Reset(newOwner, pos, vel, lifeTime);
-                    age = 0;
-                }
-                public override void Update(bool eu)
-                {
-                    base.Update(eu);
-                    age++;
-                    vel *= 0.9f;
-                }
-                public override Color MyColor(float timeStacker)
-                {
-                    return JetSmokeColor(Mathf.InverseLerp(6f, 1f, (float)age + timeStacker));
-                }
-                public Color JetSmokeColor(float lrp)
-                {
-                    HSLColor baseColor = HSLColor.Lerp(new HSLColor(0.65f, 1f, 0.5f), new HSLColor(0.5f, 0.5f, 0.6f), lrp); //blue color
-                    //HSLColor baseColor = HSLColor.Lerp(new HSLColor(0.25f, 1f, 0.3f), new HSLColor(0.15f, 0.7f, 0.6f), lrp); //green color
-                    //HSLColor baseColor = HSLColor.Lerp(new HSLColor(0.1f, 1f, 0.5f), new HSLColor(0.13f, 1f, 0.65f), lrp); //yellow color
-
-                    return baseColor.rgb;
-                }
-                public override float MyOpactiy(float timeStacker)
-                {
-                    return Mathf.Lerp(1f, 0.85f, Mathf.InverseLerp(2f, 6f, (float)age + timeStacker));
-                }
-                public override float MyRad(float timeStacker)
-                {
-                    return Mathf.Pow(Mathf.Sin(Mathf.Lerp(lastLife, life, timeStacker) * Mathf.PI / 2f + 0.75f), 2f) * 3f * Mathf.Pow(power / 5f, 0.3f);
-                }
-                public override float ConDist(float timeStacker)
-                {
-                    return Mathf.Lerp(0.1f, 0f, Mathf.InverseLerp(0.5f, 1f, Mathf.Lerp(lastLife, life, timeStacker))) * power;
-                }
-
-                public override void InitiateSprites(RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam)
-                {
-                    base.InitiateSprites(sLeaser, rCam);
-                    sLeaser.sprites[0].shader = rCam.room.game.rainWorld.Shaders["SmokeTrail"];
-                    sLeaser.sprites[1].shader = rCam.room.game.rainWorld.Shaders["FireSmoke"];
-                    sLeaser.sprites[2].shader = rCam.room.game.rainWorld.Shaders["FireSmoke"];
-                }
-
-                public override void HybridDraw(RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam, float timeStacker, Vector2 camPos, Vector2 Apos, Vector2 Bpos, Color Acol, Color Bcol, float Arad, float Brad)
-                {
-                    base.HybridDraw(sLeaser, rCam, timeStacker, camPos, Apos, Bpos, Acol, Bcol, Arad, Brad);
-                    sLeaser.sprites[1].alpha = Mathf.Pow(Acol.a, 0.75f);
-                    Acol.a = 1f;
-                    sLeaser.sprites[1].color = Acol;
-                    sLeaser.sprites[1].scale = Arad / 1.5f;
-                    sLeaser.sprites[1].scaleX *= power / 4.5f;
-                    sLeaser.sprites[1].rotation = Custom.AimFromOneVectorToAnother(pos, pos + vel);
-                    sLeaser.sprites[2].alpha = Mathf.Pow(Bcol.a, 1.1f);
-                    Bcol.a = 1f;
-                    sLeaser.sprites[2].color = Color.Lerp(Bcol, Color.white, Mathf.InverseLerp(0f, 0.8f, Mathf.Lerp(lastLife, life, timeStacker)) * 0.85f);
-                    sLeaser.sprites[2].scale = Brad / 3f;
-                    sLeaser.sprites[2].scaleY *= 1.5f;
-                    sLeaser.sprites[2].rotation = Custom.AimFromOneVectorToAnother(pos, pos + vel);
-                }
-            }
-            public BuzzJets(Room room, BuzzGraphics g) : base(BuzzEnums.BuzzSmoke, room, default, 3, 0f, autoSpawn: false, 2f, -1)
-            {
-                graphics = g;
-            }
-            public override SmokeSystemParticle CreateParticle()
-            {
-                return new BuzzSmokeSegment();
-            }
-
-            public void EmitParticles(Vector2 vel, float power)
-            {
-                if (AddParticle(pos, vel * power, 3f) is BuzzSmokeSegment smokeSegment)
-                {
-                    smokeSegment.power = power;
-                }
-            }
-
-            public void MoveToInternalContainer(int container)
-            {
-                for (int i = 0; i < particles.Count; i++)
-                {
-                    graphics.AddObjectToInternalContainer(particles[i], container);
-                }
-            }
-        }
-
-        private struct JetData
+        public struct JetData
         {
             public Vector2 pos;
             public Vector2 lastPos;
             public Vector2 scale;
             public Vector2 lastScale;
             public float rotation;
-            public float lastRotation;
             public float flamePower;
-            public float lastFlamePower;
-            public BuzzJets smoke;
+        }
+        public struct AbdomenData
+        {
+            public Vector2 pos;
+            public Vector2 lastPos;
+            public float scale;
+            public float lastScale;
         }
 
         private Buzz buzz;
@@ -534,14 +443,14 @@ namespace BuzzCreature.Objects.Buzz
         private int HeadSprite;
         private int EyeSprites;
         private int JetSprites;
-
         private int buttSprites;
-        private Vector2[] abdomenPositions;
-        private Vector2[] lastAbdomenPositions;
-        private float[] abdomenScales;
-        private float[] lastAbdomenScales;
 
-        private JetData[] jetData;
+        private float upBoost = 1f;
+        private float downBoost = 1f;
+
+        public AbdomenData[] abdomenData;
+
+        public JetData[] jetData;
 
         public Color bodyColor;
         public Color lightColor;
@@ -552,10 +461,7 @@ namespace BuzzCreature.Objects.Buzz
         {
             buzz = ow as Buzz;
             buttSprites = 16;
-            abdomenPositions = new Vector2[buttSprites];
-            lastAbdomenPositions = new Vector2[buttSprites];
-            abdomenScales = new float[buttSprites];
-            lastAbdomenScales = new float[buttSprites];
+            abdomenData = new AbdomenData[buttSprites];
             jetData = new JetData[4];
 
             totalSprites = buttSprites;
@@ -607,12 +513,6 @@ namespace BuzzCreature.Objects.Buzz
             }
 
             this.bodyParts = [.. bodyParts];
-
-            for (int i = 0; i < 4; i++)
-            {
-                jetData[i].smoke = new(buzz.room, this);
-                buzz.room.AddObject(jetData[i].smoke);
-            }
         }
 
         public override void InitiateSprites(RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam)
@@ -654,6 +554,7 @@ namespace BuzzCreature.Objects.Buzz
                 }
             }
 
+
             antennae.InitiateSprites(sLeaser, rCam);
             AddToContainer(sLeaser, rCam, null);
 
@@ -693,18 +594,17 @@ namespace BuzzCreature.Objects.Buzz
 
             int rotationIndex = Mathf.RoundToInt(Mathf.Clamp(Mathf.Abs(bodyRotation.x * 4f), 0f, 4f));
 
+            sLeaser.sprites[BodySprite].SetPosition(bodyPos - camPos);
             sLeaser.sprites[BodySprite].SetElementByName("buzzBody" + rotationIndex);
             sLeaser.sprites[BodySprite].scaleY = 1.4f + -Mathf.Clamp01(bodyRotation.y) * 0.1f;
             sLeaser.sprites[BodySprite].scaleX = bodyRotation.x > 0f ? -1.4f : 1.4f;
             sLeaser.sprites[BodySprite].rotation = -bodyRotation.x * 10f;
 
-
             for (int i = 0; i < buttSprites; i++)
             {
-                sLeaser.sprites[i].SetPosition(Vector2.Lerp(lastAbdomenPositions[i], abdomenPositions[i], timeStacker) - camPos);
-                sLeaser.sprites[i].scale = Mathf.Lerp(lastAbdomenScales[i], abdomenScales[i], timeStacker);
+                sLeaser.sprites[i].SetPosition(Vector2.Lerp(abdomenData[i].lastPos, abdomenData[i].pos, timeStacker) - camPos);
+                sLeaser.sprites[i].scale = Mathf.Lerp(abdomenData[i].lastScale, abdomenData[i].scale, timeStacker);
             }
-            sLeaser.sprites[BodySprite].SetPosition(bodyPos - camPos);
             sLeaser.sprites[HeadSprite].SetPosition(headPos - camPos);
             sLeaser.sprites[HeadSprite].scaleX = Mathf.Lerp(0.55f, 0.5f, Mathf.InverseLerp(0.2f, 0.6f, Mathf.Abs(bodyRotation.x)));
 
@@ -717,12 +617,11 @@ namespace BuzzCreature.Objects.Buzz
             sLeaser.sprites[EyeSprites + 1].y -= Mathf.Clamp01(-bodyRotation.y);
             sLeaser.sprites[EyeSprites + 1].scaleX = Mathf.Lerp(0.19f, 0f, Mathf.InverseLerp(0.2f, 0.6f, bodyRotation.x));
 
-            Vector2 jetLowerPosition = Vector2.Lerp(lastAbdomenPositions[1], abdomenPositions[1], timeStacker);
+            Vector2 jetLowerPosition = Vector2.Lerp(abdomenData[1].lastPos, abdomenData[1].pos, timeStacker);
 
             for (int i = 0; i < 4; i++)
             {
                 jetData[i].lastPos = jetData[i].pos;
-                jetData[i].lastRotation = jetData[i].rotation;
             }
 
             jetData[0].pos = bodyPos + new Vector2(6f, 11f);
@@ -742,18 +641,18 @@ namespace BuzzCreature.Objects.Buzz
             jetData[3].rotation = -44f;
 
             // X Rotation of Upper Jets
-            //  Right Upper Jets
+            //  Right Upper Jet
             jetData[0].pos.x += Mathf.Sin(bodyRotation.x * Mathf.PI / 2f) * 5f;
             jetData[0].pos.y -= Mathf.Lerp(0f, 3f, Mathf.InverseLerp(0f, 1f, Mathf.Abs(bodyRotation.x)));
             jetData[0].rotation = Mathf.Lerp(20f, 85f, Mathf.InverseLerp(0f, 1f, bodyRotation.x));
 
-            //  Left Upper Jets
+            //  Left Upper Jet
             jetData[1].pos.x += Mathf.Sin(bodyRotation.x * Mathf.PI / 2f) * 5f;
             jetData[1].pos.y -= Mathf.Lerp(0f, 3f, Mathf.InverseLerp(0f, 1f, Mathf.Abs(bodyRotation.x)));
             jetData[1].rotation = Mathf.Lerp(-20f, -85f, Mathf.InverseLerp(0f, -1f, bodyRotation.x));
 
             // X Rotation of Lower Jets
-            //  Right Lower Jets
+            //  Right Lower Jet
             jetData[2].pos.x += Mathf.Sin(Mathf.Clamp01(bodyRotation.x) * Mathf.PI) * 4f;
             jetData[2].pos.y += Mathf.Sin(Mathf.Abs(bodyRotation.x) * Mathf.PI - Mathf.PI / 2f - Mathf.Cos(Mathf.Abs(bodyRotation.x) * Mathf.PI - Mathf.PI / 2f + Mathf.PI)) * 3f + 3f;
             jetData[2].scale.x = Mathf.Lerp(0.8f, 0.9f, Mathf.InverseLerp(0f, 0.5f, Mathf.Pow(Mathf.Clamp01(bodyRotation.x) - (Mathf.Clamp(-bodyRotation.y, 0.5f, 1f) - 0.5f) * 2f, 2f)));
@@ -762,7 +661,7 @@ namespace BuzzCreature.Objects.Buzz
             jetData[2].rotation = Mathf.Lerp(-Custom.AimFromOneVectorToAnother(lowerBodyPos, jetData[2].pos) / 2f + 15f, 44f, Mathf.InverseLerp(0.4f, 0f, Mathf.Pow(Mathf.Clamp01(bodyRotation.x) - (Mathf.Clamp(-bodyRotation.y, 0.5f, 1f) - 0.5f) * 2f, 2f)));
             jetData[2].rotation -= Mathf.Sin((Mathf.Clamp01(bodyRotation.x) - (Mathf.Clamp(-bodyRotation.y, 0.5f, 1f) - 0.5f) * 2f) * Mathf.PI) * 4f;
 
-            //  Left Lower Jets
+            //  Left Lower Jet
             jetData[3].pos.x += Mathf.Sin(-Mathf.Clamp01(-bodyRotation.x) * Mathf.PI) * 4f;
             jetData[3].pos.y += Mathf.Sin(Mathf.Abs(bodyRotation.x) * Mathf.PI - Mathf.PI / 2f - Mathf.Cos(Mathf.Abs(bodyRotation.x) * Mathf.PI - Mathf.PI / 2f + Mathf.PI)) * 3f + 3f;
             jetData[3].scale.x = Mathf.Lerp(0.8f, 0.9f, Mathf.InverseLerp(0f, -0.5f, -Mathf.Pow(Mathf.Clamp01(-bodyRotation.x) - (Mathf.Clamp(-bodyRotation.y, 0.5f, 1f) - 0.5f) * 2f, 2f)));
@@ -783,16 +682,16 @@ namespace BuzzCreature.Objects.Buzz
             }
 
             // Y Rotation of Lower Jets
-            //  Right Lower Jets
+            //  Right Lower Jet
             jetData[2].pos.x -= Mathf.Lerp(0f, 4f, Mathf.InverseLerp(0f, -1f, bodyRotation.y));
-            jetData[2].pos.x -= Mathf.Sin(Mathf.Clamp01(-bodyRotation.y)* Mathf.PI) * 2f;
+            jetData[2].pos.x -= Mathf.Sin(Mathf.Clamp01(-bodyRotation.y) * Mathf.PI) * 2f;
             jetData[2].pos.y += Mathf.Lerp(0f, 14f, Mathf.InverseLerp(0.2f, -0.8f, bodyRotation.y));
             jetData[2].scale.x -= Mathf.Pow(Mathf.Sin((Mathf.Clamp(bodyRotation.y, -0.8f, -0.4f) + 0.4f) * 2.5f * Mathf.PI), 2f) / 2.5f;
             jetData[2].scale.y -= Mathf.Lerp(0f, 0.1f, Mathf.InverseLerp(0f, -1f, bodyRotation.y));
             jetData[2].rotation *= Mathf.Lerp(1f, 0f, Mathf.InverseLerp(0f, -0.5f, bodyRotation.y));
             jetData[2].rotation -= Mathf.Lerp(0f, 75f, Mathf.InverseLerp(-0.3f, -0.8f, bodyRotation.y));
 
-            //  Left Lower Jets
+            //  Left Lower Jet
             jetData[3].pos.x += Mathf.Lerp(0f, 4f, Mathf.InverseLerp(0f, -1f, bodyRotation.y));
             jetData[3].pos.x += Mathf.Sin(Mathf.Clamp01(-bodyRotation.y) * Mathf.PI) * 2f;
             jetData[3].pos.y += Mathf.Lerp(0f, 14f, Mathf.InverseLerp(0.2f, -0.8f, bodyRotation.y));
@@ -806,7 +705,7 @@ namespace BuzzCreature.Objects.Buzz
                 sLeaser.sprites[JetSprites + i].SetPosition(Vector2.Lerp(jetData[i].lastPos, jetData[i].pos, timeStacker) - camPos);
                 sLeaser.sprites[JetSprites + i].scaleX = jetData[i].scale.x;
                 sLeaser.sprites[JetSprites + i].scaleY = jetData[i].scale.y;
-                sLeaser.sprites[JetSprites + i].rotation = Mathf.Lerp(jetData[i].lastRotation, jetData[i].rotation, timeStacker);
+                sLeaser.sprites[JetSprites + i].rotation = jetData[i].rotation;
             }
 
             // Sprite Layering
@@ -838,27 +737,25 @@ namespace BuzzCreature.Objects.Buzz
                 sLeaser.sprites[JetSprites + 2].MoveBehindOtherNode(sLeaser.sprites[buttSprites - 1]);
                 sLeaser.sprites[JetSprites + 3].MoveBehindOtherNode(sLeaser.sprites[buttSprites - 1]);
             }
+
             sLeaser.containers[0].MoveBehindOtherNode(sLeaser.sprites[JetSprites]);
             sLeaser.containers[1].MoveBehindOtherNode(sLeaser.sprites[JetSprites + 1]);
             sLeaser.containers[2].MoveBehindOtherNode(sLeaser.sprites[JetSprites + 2]);
             sLeaser.containers[3].MoveBehindOtherNode(sLeaser.sprites[JetSprites + 3]);
 
             // Jet Flames
-            jetData[0].smoke.MoveToInternalContainer(0);
-            jetData[0].smoke.MoveTo(Vector2.Lerp(jetData[0].lastPos, jetData[0].pos, timeStacker) + Custom.DegToVec(jetData[0].rotation), buzz.evenUpdate);
-            jetData[0].smoke.EmitParticles(Custom.DegToVec(jetData[0].rotation) * Mathf.Lerp(jetData[0].lastFlamePower, jetData[0].flamePower, timeStacker) / 3f, Mathf.Lerp(jetData[0].lastFlamePower, jetData[0].flamePower, timeStacker));
-
-            jetData[1].smoke.MoveToInternalContainer(1);
-            jetData[1].smoke.MoveTo(Vector2.Lerp(jetData[1].lastPos, jetData[1].pos, timeStacker) + Custom.DegToVec(jetData[1].rotation), buzz.evenUpdate);
-            jetData[1].smoke.EmitParticles(Custom.DegToVec(jetData[1].rotation) * Mathf.Lerp(jetData[1].lastFlamePower, jetData[1].flamePower, timeStacker) / 3f, Mathf.Lerp(jetData[1].lastFlamePower, jetData[1].flamePower, timeStacker));
-
-            jetData[2].smoke.MoveToInternalContainer(2);
-            jetData[2].smoke.MoveTo(Vector2.Lerp(jetData[2].lastPos, jetData[2].pos, timeStacker) + -Custom.PerpendicularVector(Custom.DegToVec(jetData[2].rotation)), buzz.evenUpdate);
-            jetData[2].smoke.EmitParticles(-Custom.PerpendicularVector(Custom.DegToVec(jetData[2].rotation)) * Mathf.Lerp(jetData[2].lastFlamePower, jetData[2].flamePower, timeStacker) / 3f, Mathf.Lerp(jetData[2].lastFlamePower, jetData[2].flamePower, timeStacker));
-
-            jetData[3].smoke.MoveToInternalContainer(3);
-            jetData[3].smoke.EmitParticles(Custom.PerpendicularVector(Custom.DegToVec(jetData[3].rotation)) * Mathf.Lerp(jetData[3].lastFlamePower, jetData[3].flamePower, timeStacker) / 3f, Mathf.Lerp(jetData[3].lastFlamePower, jetData[3].flamePower, timeStacker));
-            jetData[3].smoke.MoveTo(Vector2.Lerp(jetData[3].lastPos, jetData[3].pos, timeStacker) + Custom.PerpendicularVector(Custom.DegToVec(jetData[3].rotation)), buzz.evenUpdate);
+            for (int i = 0; i < 4; i++)
+            {
+                Vector2 jetPos = Vector2.Lerp(jetData[i].lastPos, jetData[i].pos, timeStacker);
+                Vector2 jetRot = Custom.DegToVec(jetData[i].rotation);
+                if (i >= 2)
+                {
+                    jetRot = (i == 2 ? -1f : 1f) * Custom.PerpendicularVector(jetRot) * 1.5f;
+                }
+                buzz.jets[i].smoke?.MoveToInternalContainer(i, this);
+                buzz.jets[i].smoke?.MoveTo(jetPos + jetRot, buzz.evenUpdate);
+                buzz.jets[i].smoke?.EmitParticles(jetRot, jetData[i].flamePower);
+            }
 
 
             for (int i = 0; i < 2; i++)
@@ -877,15 +774,15 @@ namespace BuzzCreature.Objects.Buzz
         public override void ApplyPalette(RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam, RoomPalette palette)
         {
             bodyColor = new Color(0.25f, 0.4f, 0.6f);
-            lightColor = new Color(0f, 0.75f, 0.7f);
+            lightColor = new HSLColor(0.5f, 0.5f, 0.6f).rgb;
             darkColor = new Color(0.05f, 0f, 0.1f);
             Color blackColor = Color.Lerp(palette.blackColor, darkColor, 0.5f);
 
             for (int i = 0; i < buttSprites; i++)
             {
                 Color abdomenColor = blackColor;
-                if (i % 4 == 0) abdomenColor = lightColor;
-                //if (i % 4 == 1) abdomenColor = lightColor;
+                //if (i % 4 == 0) abdomenColor = lightColor;
+                if (i % 4 == 1) abdomenColor = lightColor;
                 sLeaser.sprites[i].color = abdomenColor;
             }
             sLeaser.sprites[BodySprite].color = Color.Lerp(bodyColor, blackColor, 0.6f);
@@ -932,71 +829,50 @@ namespace BuzzCreature.Objects.Buzz
             head.pos.y += bodyRotation.y + Mathf.Abs(bodyRotation.x * 4f);
 
             // Abdomen position and scale
-            for (int i = 0; i < abdomenPositions.Length; i++)
+            for (int i = 0; i < abdomenData.Length; i++)
             {
-                float pos = (float)i / (float)abdomenPositions.Length;
-                lastAbdomenPositions[i] = abdomenPositions[i];
-                abdomenPositions[i] = (Vector2)Vector3.Slerp(buzz.bodyChunks[0].pos, buzz.bodyChunks[1].pos, pos);
-                abdomenPositions[i].y -= Mathf.Sin(pos * Mathf.PI * (-Mathf.Abs(bodyRotation.x) - bodyRotation.y)) * 3f;
+                float pos = (float)i / (float)abdomenData.Length;
+                abdomenData[i].lastPos = abdomenData[i].pos;
+                abdomenData[i].pos = (Vector2)Vector3.Slerp(buzz.bodyChunks[0].pos, buzz.bodyChunks[1].pos, pos);
+                abdomenData[i].pos.y -= Mathf.Sin(pos * Mathf.PI * (-Mathf.Abs(bodyRotation.x) - bodyRotation.y)) * 3f;
             }
-            for (int i = 0; i < abdomenPositions.Length; i++)
+            for (int i = 0; i < abdomenData.Length; i++)
             {
-                float pos = (float)i / (float)abdomenPositions.Length;
-                lastAbdomenScales[i] = abdomenScales[i];
-                abdomenScales[i] = 0.7f + Mathf.Sin(pos * Mathf.PI - 0.4f);
+                float pos = (float)i / (float)abdomenData.Length;
+                abdomenData[i].lastScale = abdomenData[i].scale;
+                abdomenData[i].scale = 0.7f + Mathf.Sin(pos * Mathf.PI - 0.4f);
             }
 
             // Setting power levels for jets
             if (buzz.Consious)
             {
-                float upBoost = 1f;
-                float downBoost = 1f;
-                float leftBoost = 1f;
-                float rightBoost = 1f;
                 if (buzz.mainBodyChunk.vel.y < -8f)
                 {
+                    // boost upward after free fall
                     for (int i = 0; i < 4; i++)
                     {
                         jetData[i].flamePower = Mathf.Lerp(jetData[i].flamePower, 0f, 0.8f);
                     }
                     downBoost += 0.05f;
-                    downBoost = Mathf.Clamp(downBoost, 1f, 2f);
+                    downBoost = Mathf.Clamp(downBoost, 1f, 1.4f);
                 }
                 else if (buzz.thrustVel.y > 2f && buzz.mainBodyChunk.vel.y > -1f)
                 {
+                    // boost downward after rising
                     jetData[0].flamePower = Mathf.Lerp(jetData[0].flamePower, 0f, 0.75f);
                     jetData[1].flamePower = Mathf.Lerp(jetData[1].flamePower, 0f, 0.75f);
                     upBoost += 0.05f;
                     upBoost = Mathf.Clamp(upBoost, 1f, 1.4f);
                 }
-                else if (Mathf.Abs(buzz.thrustVel.x) > 1f)
-                {
-                    for (int i = 0; i < 4; i++)
-                    {
-                        jetData[i].flamePower = Mathf.Lerp(jetData[i].flamePower, 3f, 0.2f);
-                    }
-                    if (buzz.thrustVel.x > 0f)
-                    {
-                        rightBoost += 0.05f;
-                        rightBoost = Mathf.Clamp(rightBoost, 1f, 1.5f);
-                    }
-                    else
-                    {
-                        leftBoost += 0.05f;
-                        leftBoost = Mathf.Clamp(leftBoost, 1f, 1.5f);
-                    }
-                }
                 else
                 {
-                    jetData[0].flamePower = 1f * upBoost * leftBoost * buzz.jetPower;
-                    jetData[1].flamePower = 1f * upBoost * rightBoost * buzz.jetPower;
-                    jetData[2].flamePower = 4.5f * downBoost * leftBoost * buzz.jetPower;
-                    jetData[3].flamePower = 4.5f * downBoost * rightBoost * buzz.jetPower;
+                    jetData[0].flamePower = 1f * upBoost * buzz.jetPower;
+                    jetData[1].flamePower = 1f * upBoost * buzz.jetPower;
+                    jetData[2].flamePower = 4.5f * downBoost * buzz.jetPower;
+                    jetData[3].flamePower = 4.5f * downBoost * buzz.jetPower;
 
-                    downBoost = Mathf.Lerp(downBoost, 1f, 0.05f);
-                    upBoost = Mathf.Lerp(upBoost, 1f, 0.05f);
-                    leftBoost = Mathf.Lerp(leftBoost, 1f, 0.05f);
-                    rightBoost = Mathf.Lerp(rightBoost, 1f, 0.05f);
+                    downBoost = Mathf.Lerp(downBoost, 1f, 0.3f);
+                    upBoost = Mathf.Lerp(upBoost, 1f, 0.1f);
                 }
             }
             else
@@ -1007,18 +883,14 @@ namespace BuzzCreature.Objects.Buzz
                 }
             }
 
-            for (int i = 0; i < 4; i++)
-            {
-                jetData[i].lastFlamePower = jetData[i].flamePower;
-            }
 
-                for (int i = 0; i < 2; i++)
+            for (int i = 0; i < 2; i++)
+            {
+                for (int j = 0; j < 2; j++)
                 {
-                    for (int j = 0; j < 2; j++)
-                    {
-                        hands[i, j].Update();
-                    }
+                    hands[i, j].Update();
                 }
+            }
 
             antennae.Update();
             base.Update();
