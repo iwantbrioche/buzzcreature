@@ -146,7 +146,7 @@ namespace BuzzCreature.Objects.Buzz
         public float jetPower = 0f;
         public bool flying;
 
-        private bool debugVis = false;
+        private bool debugVis = true;
         private bool visualizePath = false;
         public Buzz(AbstractCreature abstractCreature, World world) : base(abstractCreature, world)
         {
@@ -256,50 +256,72 @@ namespace BuzzCreature.Objects.Buzz
             }
             if (Consious)
             {
-                MovementConnection movementConnection = pather.FollowPath(room.GetWorldCoordinate(mainBodyChunk.pos), true);
+                // Grab the first MovementConnection in the path starting from the Buzzes' mainBodyChunk
+                //  The actuallyFollowingThisPath parameter is specifically for leaving the room and stuff relating to savedPathConnections
+                MovementConnection startingConnection = pather.FollowPath(room.GetWorldCoordinate(mainBodyChunk.pos), actuallyFollowingThisPath: true);
 
-                if (debugVis) DebugDrawing.DrawText(room, movementConnection.ToString(), mainBodyChunk.pos + new Vector2(15f, 15f), Color.white);
+                // DebugDrawing of the MovementConnection, lists it's type, startCoord tile coords, and destinationCoord tile coords
+                if (debugVis) DebugDrawing.DrawText(room, startingConnection.ToString(), mainBodyChunk.pos + new Vector2(15f, 15f), Color.white);
 
-                if (movementConnection != default)
+                // FollowPath returns the default of MovementConnection if it can't find a path
+                if (startingConnection != default)
                 {
                     // Shortcuts and NPCTransport
-                    GoThroughFloors = movementConnection.destinationCoord.y < movementConnection.startCoord.y;
-                    if (movementConnection.type is MovementConnection.MovementType.ShortCut or MovementConnection.MovementType.NPCTransportation)
+                    GoThroughFloors = startingConnection.destinationCoord.y < startingConnection.startCoord.y;
+                    if (startingConnection.type is MovementConnection.MovementType.ShortCut or MovementConnection.MovementType.NPCTransportation)
                     {
-                        enteringShortCut = movementConnection.StartTile;
-                        if (movementConnection.type is MovementConnection.MovementType.NPCTransportation)
+                        enteringShortCut = startingConnection.StartTile;
+                        if (startingConnection.type is MovementConnection.MovementType.NPCTransportation)
                         {
-                            NPCTransportationDestination = movementConnection.destinationCoord;
+                            NPCTransportationDestination = startingConnection.destinationCoord;
                         }
                     }
                     else
                     {
-                        // Gives the average of connection positions for the buzz to follow
-                        moveDestination = room.MiddleOfTile(movementConnection.destinationCoord);
+                        // The moveDestination variable is where the buzz will move towards in the room
+                        moveDestination = room.MiddleOfTile(startingConnection.destinationCoord);
 
-                        MovementConnection pathConnection = movementConnection;
+                        // In order to make the Buzzes' flight less linear, we will use a for loop to call FollowPath multiple times,
+                        //  we then average the positions of those MovementConnections to smooth out the moveDestination
+
+                        // We create a new MovementConnection from the old connection and a counter for averaging
+                        MovementConnection pathConnection = startingConnection;
                         int pathNum = 1;
 
                         for (int i = 0; i < 3; i++)
                         {
+                            // This prevents the buzz from getting stuck in narrow spaces
                             if (room.aimap.getAItile(pathConnection.destinationCoord).narrowSpace) break;
 
-                            pathConnection = pather.FollowPath(pathConnection.destinationCoord, false);
+                            // Set pathConnection to a new MovementCoordinate by using it's previous destinationCoord as the starting WorldCoordinate
+                            //  This way it continues the path towards the destination from the previous MovementConnection found by FollowPath
+                            //  actuallyFollowingThisPath is false since the Buzz is not going to be moving directly towards this tile
+                            pathConnection = pather.FollowPath(pathConnection.destinationCoord, actuallyFollowingThisPath: false);
 
+                            // If the pathConnection returns default, then it cannot find the next MovementConnection in the path, so we break
                             if (pathConnection == default) break;
+
+                            // Buzz specific since they kept slamming into corners lol, just breaks the loop if the Buzz can't directly see the pathConnection's destinationCoord,
+                            //  The destinationCoord being the tile being moved towards 
                             if (!AI.VisualContact(room.MiddleOfTile(pathConnection.destinationCoord), 0f)) break;
 
-                            if (debugVis) DebugDrawing.DrawText(room, $"{pathNum}", room.MiddleOfTile(pathConnection.startCoord), Color.blue);
+                            // Another DebugDrawing, this draws the current pathNum on the pathConnection's startCoord, the startCoord being the tile it started pathing from
+                            if (debugVis) DebugDrawing.DrawText(room, $"{pathNum}", room.MiddleOfTile(pathConnection.startCoord), Color.green);
+
+                            // Add the position of pathConnection.startCoord to moveDestination and increment pathNum
                             moveDestination += room.MiddleOfTile(pathConnection.startCoord);
                             pathNum++;
                         }
+                        // Divide moveDestination pathNum to get the average of all the MovementConnections found during the loop
                         moveDestination /= pathNum;
 
+                        // If entering a shortcut force the buzz to move directly into it
                         if (enteringShortCut.HasValue)
                         {
                             moveDestination = room.MiddleOfTile(enteringShortCut.Value);
                         }
 
+                        // Handle movement
                         if (flying)
                         {
                             Fly();
@@ -331,6 +353,7 @@ namespace BuzzCreature.Objects.Buzz
                 accel *= Mathf.Lerp(0.2f, 1f, Mathf.InverseLerp(0f, 40f, Vector2.Distance(room.MiddleOfTile(AI.pathFinder.destination.Tile), mainBodyChunk.pos)));
             }
 
+            // DebugDrawing of a line pointing from the Buzzes' mainBodyChunk to the moveDestination
             if (debugVis) DebugDrawing.DrawLine(room, mainBodyChunk.pos, moveDestination, Color.red, 2f);
             thrustVel = Vector2.ClampMagnitude(moveDestination - mainBodyChunk.pos, 20f) / 15f * 1.75f * accel;
 
